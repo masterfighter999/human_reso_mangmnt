@@ -38,8 +38,8 @@ export default function TimeOff() {
     setLoading(true);
     try {
       const getBalancesQuery = `
-        query {
-          leaveBalances {
+        query GetPersonalTimeOff($empId: ID) {
+          leaveBalances(employeeId: $empId) {
             leave_type_id
             leave_type_name
             leave_category
@@ -53,7 +53,7 @@ export default function TimeOff() {
             category
             max_days_per_year
           }
-          leaveRequests {
+          leaveRequests(employeeId: $empId) {
             id
             employee_id
             employee_name
@@ -73,7 +73,7 @@ export default function TimeOff() {
           }
         }
       `;
-      const data = await graphqlRequest(getBalancesQuery);
+      const data = await graphqlRequest(getBalancesQuery, { empId: employee?.id || null });
       setBalances(data.leaveBalances || []);
       setLeaveTypes(data.leaveTypes || []);
       setRequests(data.leaveRequests || []);

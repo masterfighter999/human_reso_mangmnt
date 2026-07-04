@@ -66,19 +66,19 @@ export default function Dashboard() {
             monthly_wage
             profile_picture_url
           }
-          leaves {
+          leaveRequests {
             id
             status
             start_date
             end_date
-            duration
+            duration_days
             remarks
             employee {
               first_name
               last_name
               employee_code
             }
-            leaveType {
+            leave_type {
               name
             }
           }
@@ -94,7 +94,7 @@ export default function Dashboard() {
       `;
       const data = await graphqlRequest(dashboardQuery);
       setEmployeesList(data.employees || []);
-      setLeavesList(data.leaves || []);
+      setLeavesList(data.leaveRequests || []);
       setMyCheckIns(data.attendanceLogs || []);
     } catch (err) {
       console.error(err);
@@ -227,7 +227,7 @@ export default function Dashboard() {
                       <div>
                         <strong>{leave.employee ? `${leave.employee.first_name} ${leave.employee.last_name}` : 'Staff'}</strong>
                         <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
-                          Applied for {leave.leaveType?.name} ({leave.duration} days)
+                          Applied for {leave.leave_type?.name} ({leave.duration_days} days)
                         </div>
                       </div>
                       <span className="status-badge pending" style={{ textTransform: 'none' }}>
