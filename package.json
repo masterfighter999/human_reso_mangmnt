@@ -8,7 +8,7 @@
     "dev:backend": "npm run dev:js --prefix backend",
     "dev:ts-backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "concurrently \"npm run dev:ts-backend\" \"npm run dev:frontend\"",
     "db:migrate": "node backend/migrate.js"
   },
   "dependencies": {},
