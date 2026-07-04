@@ -1,4 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
+import { NotificationProvider, useNotification } from './components/NotificationContext';
+import ToastContainer from './components/ToastContainer';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate, useLocation } from 'react-router-dom';
 
 // Auth Context to manage state globally
@@ -189,7 +191,7 @@ import Payroll from './pages/Payroll';
 import Employees from './pages/Employees';
 import Approvals from './pages/Approvals';
 
-export default function App() {
+function AppInner() {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(null);
   const [employee, setEmployee] = useState(null);
@@ -291,7 +293,7 @@ export default function App() {
         `;
         await graphqlRequest(checkOutMutation);
         setActiveCheckIn(null);
-        alert('Successfully Checked Out!');
+        notify.success('Successfully Checked Out! Have a great rest of your day.');
       } else {
         const checkInMutation = `
           mutation {
@@ -303,19 +305,21 @@ export default function App() {
         `;
         const data = await graphqlRequest(checkInMutation);
         setActiveCheckIn(data.checkIn);
-        alert('Successfully Checked In!');
+        notify.success('Successfully Checked In! Your shift has started.');
       }
       loadUser();
     } catch (err) {
-      alert(err.message);
+      notify.error(err.message);
     }
   };
 
   const activeRole = user?.role === 'admin' ? viewMode : 'employee';
+  const notify = useNotification();
 
   return (
     <AuthContext.Provider value={{ token, user, employee, activeCheckIn, loading, login, logout, handleCheckInOut, reloadUser: loadUser, activeRole, viewMode, setViewMode }}>
       <Router>
+        <ToastContainer />
         <Routes>
           <Route path="/login" element={token ? <Navigate to="/" replace /> : <Login />} />
           <Route path="/signup" element={token ? <Navigate to="/" replace /> : <SignUp />} />
@@ -367,5 +371,13 @@ export default function App() {
         </Routes>
       </Router>
     </AuthContext.Provider>
+  );
+}
+
+export default function App() {
+  return (
+    <NotificationProvider>
+      <AppInner />
+    </NotificationProvider>
   );
 }
