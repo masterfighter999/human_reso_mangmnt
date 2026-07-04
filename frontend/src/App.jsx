@@ -6,7 +6,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate, us
 // Auth Context to manage state globally
 export const AuthContext = createContext();
 
-export const GRAPHQL_URL = 'http://localhost:4000/graphql';
+export const GRAPHQL_URL = 'http://localhost:5000/graphql';
 
 export async function graphqlRequest(query, variables = {}) {
   const token = localStorage.getItem('token');

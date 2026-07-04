@@ -33,6 +33,51 @@ function calculateComponents(monthlyWage) {
   };
 }
 
+// Helper to enrich an employee row with lazily-resolved nested fields.
+// graphql-js default field resolver calls function-valued properties with (args, context, info).
+function enrichEmployee(emp) {
+  if (!emp) return null;
+  return {
+    ...emp,
+    salary_structure: async (args, context) => {
+      if (!context || !context.user || context.user.role !== 'admin') return null;
+      const res = await db.query(
+        'SELECT * FROM salary_structures WHERE employee_id = $1 AND effective_to IS NULL',
+        [emp.id]
+      );
+      return res.rows[0] || null;
+    },
+    work_status: async () => {
+      const attRes = await db.query(
+        'SELECT status FROM attendance WHERE employee_id = $1 AND att_date = CURRENT_DATE',
+        [emp.id]
+      );
+      if (attRes.rowCount > 0) {
+        const s = attRes.rows[0].status;
+        if (s === 'present' || s === 'half_day') return 'present';
+        if (s === 'leave') return 'leave';
+      }
+      return 'absent';
+    }
+  };
+}
+
+// Helper to enrich a leave request row with lazily-resolved nested fields.
+function enrichLeaveRequest(lr) {
+  if (!lr) return null;
+  return {
+    ...lr,
+    leave_type: async () => {
+      const res = await db.query('SELECT * FROM leave_types WHERE id = $1', [lr.leave_type_id]);
+      return res.rows[0] || null;
+    },
+    employee: async () => {
+      const res = await db.query('SELECT * FROM employees WHERE id = $1', [lr.employee_id]);
+      return enrichEmployee(res.rows[0]);
+    }
+  };
+}
+
 const resolvers = {
   // Queries
   me: async (args, context) => {
@@ -44,7 +89,7 @@ const resolvers = {
   myProfile: async (args, context) => {
     if (!context.user) throw new Error('Authentication required');
     const res = await db.query('SELECT * FROM employees WHERE user_id = $1', [context.user.id]);
-    return res.rows[0];
+    return enrichEmployee(res.rows[0]);
   },
 
   employees: async (args, context) => {
@@ -54,20 +99,31 @@ const resolvers = {
     const res = await db.query('SELECT * FROM employees ORDER BY created_at DESC');
     const employees = res.rows;
 
-    // Fetch active salary structures for all employees (admin context)
-    const ssRes = await db.query(`
-      SELECT * FROM salary_structures
-      WHERE effective_to IS NULL
-    `);
+    // Batch-fetch active salary structures
+    const ssRes = await db.query('SELECT * FROM salary_structures WHERE effective_to IS NULL');
     const salaryMap = {};
     for (const ss of ssRes.rows) {
       salaryMap[ss.employee_id] = ss;
     }
 
-    return employees.map((emp) => ({
-      ...emp,
-      salary_structure: salaryMap[emp.id] || null,
-    }));
+    // Batch-fetch today's attendance for work_status
+    const empIds = employees.map(e => e.id);
+    const attRes = empIds.length > 0
+      ? await db.query(
+          `SELECT employee_id, status FROM attendance WHERE att_date = CURRENT_DATE AND employee_id = ANY($1::uuid[])`,
+          [empIds]
+        )
+      : { rows: [] };
+    const attMap = {};
+    for (const a of attRes.rows) { attMap[a.employee_id] = a.status; }
+
+    return employees.map(emp => {
+      const attStatus = attMap[emp.id];
+      let work_status = 'absent';
+      if (attStatus === 'present' || attStatus === 'half_day') work_status = 'present';
+      else if (attStatus === 'leave') work_status = 'leave';
+      return { ...emp, salary_structure: salaryMap[emp.id] || null, work_status };
+    });
   },
 
   employee: async ({ id }, context) => {
@@ -75,22 +131,13 @@ const resolvers = {
     const res = await db.query('SELECT * FROM employees WHERE id = $1', [id]);
     const emp = res.rows[0];
     if (!emp) return null;
-    
-    // Only admin or the employee themselves can see profile
+
+    // Only admin or the employee themselves can view the profile
     if (context.user.role !== 'admin' && context.user.id !== emp.user_id) {
       throw new Error('Unauthorized');
     }
 
-    // Attach salary_structure for admin
-    if (context.user.role === 'admin') {
-      const ssRes = await db.query(
-        'SELECT * FROM salary_structures WHERE employee_id = $1 AND effective_to IS NULL',
-        [emp.id]
-      );
-      return { ...emp, salary_structure: ssRes.rows[0] || null };
-    }
-
-    return emp;
+    return enrichEmployee(emp);
   },
 
 
@@ -176,7 +223,7 @@ const resolvers = {
     queryStr += ' ORDER BY r.created_at DESC';
 
     const res = await db.query(queryStr, params);
-    return res.rows;
+    return res.rows.map(enrichLeaveRequest);
   },
 
   leaveTypes: async () => {
@@ -312,7 +359,7 @@ const resolvers = {
       await client.query('COMMIT');
 
       const token = signToken(user);
-      return { token, user, employee };
+      return { token, user, employee: enrichEmployee(employee) };
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;
@@ -340,7 +387,7 @@ const resolvers = {
     await db.query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]);
 
     const token = signToken(user);
-    return { token, user, employee };
+    return { token, user, employee: enrichEmployee(employee) };
   },
 
   createEmployee: async ({ firstName, lastName, email, phone, department, designation, dateOfJoining, monthlyWage }, context) => {
@@ -408,7 +455,7 @@ const resolvers = {
       // Let's store temporary text in about_me for display, so the admin sees the temp password on success!
       employee.about_me = `Credentials -> Login ID: ${loginId} | Temporary Password: ${tempPassword}`;
       
-      return employee;
+      return enrichEmployee(employee);
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;
@@ -455,13 +502,13 @@ const resolvers = {
 
     if (fields.length === 0) {
       const res = await db.query('SELECT * FROM employees WHERE id = $1', [employeeId]);
-      return res.rows[0];
+      return enrichEmployee(res.rows[0]);
     }
 
     params.push(employeeId);
     const queryStr = `UPDATE employees SET ${fields.join(', ')}, updated_at = now() WHERE id = $${index} RETURNING *`;
     const updateRes = await db.query(queryStr, params);
-    return updateRes.rows[0];
+    return enrichEmployee(updateRes.rows[0]);
   },
 
   updateSalaryStructure: async ({ employeeId, workingDaysWeek, breakTimeMins, bankName, accountNumber, ifscCode, panNo, uanNo, monthlyWage }, context) => {
@@ -622,7 +669,7 @@ const resolvers = {
       RETURNING *
     `, [employeeId, leaveTypeId, startDate, endDate, durationDays, remarks, attachmentUrl]);
 
-    return insertRes.rows[0];
+    return enrichLeaveRequest(insertRes.rows[0]);
   },
 
   reviewLeave: async ({ leaveRequestId, status, reviewComments }, context) => {
@@ -671,7 +718,7 @@ const resolvers = {
       }
 
       await client.query('COMMIT');
-      return request;
+      return enrichLeaveRequest(request);
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;
@@ -833,41 +880,5 @@ const resolvers = {
   }
 };
 
-// Resolver bindings for complex types
-const EmployeeResolvers = {
-  salary_structure: async (parent, args, context) => {
-    if (!context.user || context.user.role !== 'admin') return null;
-    const res = await db.query('SELECT * FROM salary_structures WHERE employee_id = $1 AND effective_to IS NULL', [parent.id]);
-    return res.rows[0] || null;
-  },
-  work_status: async (parent, args, context) => {
-    const attRes = await db.query(
-      'SELECT status FROM attendance WHERE employee_id = $1 AND att_date = CURRENT_DATE',
-      [parent.id]
-    );
-    if (attRes.rowCount > 0) {
-      const status = attRes.rows[0].status;
-      if (status === 'present' || status === 'half_day') return 'present';
-      if (status === 'leave') return 'leave';
-    }
-    return 'absent';
-  }
-};
-
-const LeaveRequestResolvers = {
-  leave_type: async (parent) => {
-    const res = await db.query('SELECT * FROM leave_types WHERE id = $1', [parent.leave_type_id]);
-    return res.rows[0] || null;
-  },
-  employee: async (parent) => {
-    const res = await db.query('SELECT * FROM employees WHERE id = $1', [parent.employee_id]);
-    return res.rows[0] || null;
-  }
-};
-
-// Expose main resolvers plus nesting resolvers
-module.exports = {
-  ...resolvers,
-  Employee: EmployeeResolvers,
-  LeaveRequest: LeaveRequestResolvers
-};
+// Expose main resolvers
+module.exports = resolvers;
