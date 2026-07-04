@@ -1,26 +1,58 @@
 {
   "name": "hrms-backend",
   "version": "1.0.0",
-  "description": "HRMS Backend Service",
-  "main": "server.js",
+  "description": "Human Resource Management System — Backend API with GraphQL and REST Auth",
+  "main": "dist/server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
-    "migrate": "node migrate.js"
+    "start": "node dist/server.js",
+    "dev": "ts-node-dev --respawn --transpile-only --exit-child src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "db:migrate": "ts-node src/db/migrate.ts",
+    "db:seed": "ts-node src/db/seed.ts",
+    "db:reset": "ts-node src/db/reset.ts",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "test:payroll": "node tests/payroll.test.js",
+    "dev:js": "nodemon server.js"
   },
+  "keywords": [
+    "hrms",
+    "hr",
+    "backend",
+    "api",
+    "graphql"
+  ],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "express-rate-limit": "^8.5.2",
     "graphql": "^16.8.1",
     "graphql-http": "^1.22.1",
-    "human-resource-management-system": "file:..",
+    "helmet": "^8.2.0",
     "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.11.0",
+    "multer": "^2.0.0-rc.4",
     "pg": "^8.12.0",
-    "ruru": "^2.0.0-beta.12"
+    "ruru": "^2.0.0-beta.12",
+    "uuid": "^9.0.1",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
-    "nodemon": "^3.1.4"
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/morgan": "^1.9.9",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^20.14.9",
+    "@types/pg": "^8.11.6",
+    "@types/uuid": "^9.0.8",
+    "nodemon": "^3.1.4",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.2"
   }
 }
