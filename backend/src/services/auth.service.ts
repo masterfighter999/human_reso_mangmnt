@@ -84,9 +84,9 @@ export class AuthService {
       return newUser;
     });
 
-    // Send verification email
-    const verificationToken = signEmailVerificationToken(user.id, user.email);
-    await sendVerificationEmail(user.email, verificationToken);
+    // Send verification email (disabled)
+    // const verificationToken = signEmailVerificationToken(user.id, user.email);
+    // await sendVerificationEmail(user.email, verificationToken);
 
     return {
       user: { id: user.id, email: user.email, role: user.role },
@@ -108,10 +108,6 @@ export class AuthService {
 
     if (!user || !isValid) {
       throw new UnauthorizedError('Invalid email or password');
-    }
-
-    if (!user.email_verified) {
-      throw new UnauthorizedError('Please verify your email before logging in');
     }
 
     const tokens = generateTokenPair(user.id, user.email, user.role);

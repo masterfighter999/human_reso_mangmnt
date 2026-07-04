@@ -41,8 +41,8 @@ export class UserRepository {
     data: { email: string; passwordHash: string; role: UserRole },
   ): Promise<UserRow> {
     const result = await client.query<UserRow>(
-      `INSERT INTO users (email, password_hash, role)
-       VALUES ($1, $2, $3)
+      `INSERT INTO users (email, password_hash, role, email_verified)
+       VALUES ($1, $2, $3, TRUE)
        RETURNING id, email, password_hash, role, email_verified, email_verified_at, last_login_at, created_at, updated_at`,
       [data.email, data.passwordHash, data.role],
     );
