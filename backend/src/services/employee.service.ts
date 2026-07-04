@@ -10,7 +10,10 @@ export class EmployeeService {
    */
   async getProfile(employeeId: string, requesterUserId: string, requesterRole: UserRole): Promise<any> {
     // Determine the user_id of the requested employee
-    const empRes = await query(`SELECT * FROM employees WHERE id = $1`, [employeeId]);
+    const empRes = await query(
+      `SELECT *, employee_id AS employee_code FROM employees WHERE id = $1`,
+      [employeeId]
+    );
     if (empRes.rowCount === 0) {
       throw new NotFoundError('Employee');
     }
@@ -58,7 +61,10 @@ export class EmployeeService {
     requesterUserId: string,
     requesterRole: UserRole
   ): Promise<any> {
-    const empRes = await query(`SELECT * FROM employees WHERE id = $1`, [employeeId]);
+    const empRes = await query(
+      `SELECT *, employee_id AS employee_code FROM employees WHERE id = $1`,
+      [employeeId]
+    );
     if (empRes.rowCount === 0) {
       throw new NotFoundError('Employee');
     }

@@ -279,7 +279,7 @@ const resolvers = {
     }
 
     let queryStr = `
-      SELECT p.*, concat(e.first_name, ' ', e.last_name) as employee_name, e.employee_code
+      SELECT p.*, concat(e.first_name, ' ', e.last_name) as employee_name, e.employee_id as employee_code
       FROM payslips p
       JOIN employees e ON p.employee_id = e.id
       WHERE 1=1
@@ -334,11 +334,16 @@ const resolvers = {
       `, [loginId, email, passwordHash]);
       const user = userRes.rows[0];
 
+      // Generate employee code from sequence (race-condition-free)
+      const seqRes = await client.query("SELECT nextval('employee_code_seq') AS seq");
+      const seq = seqRes.rows[0].seq;
+      const empCode = `EMP-${new Date().getFullYear()}-${String(seq).padStart(4, '0')}`;
+
       const empRes = await client.query(`
-        INSERT INTO employees (user_id, employee_code, first_name, last_name, phone, date_of_joining, designation, department)
+        INSERT INTO employees (user_id, employee_id, first_name, last_name, phone, date_of_joining, designation, department)
         VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, 'HR / Admin', 'Human Resources')
         RETURNING *
-      `, [user.id, loginId, firstName, lastName, phone]);
+      `, [user.id, empCode, firstName, lastName, phone]);
       const employee = empRes.rows[0];
 
       // Seed salary structure for admin (fixed default wage)
@@ -420,14 +425,19 @@ const resolvers = {
       `, [loginId, email, passwordHash]);
       const user = userRes.rows[0];
 
+      // Generate employee code from sequence (race-condition-free)
+      const seqRes = await client.query("SELECT nextval('employee_code_seq') AS seq");
+      const seq = seqRes.rows[0].seq;
+      const empCode = `EMP-${new Date(dateOfJoining).getFullYear()}-${String(seq).padStart(4, '0')}`;
+
       // Create Employee
       const empRes = await client.query(`
         INSERT INTO employees (
-          user_id, employee_code, first_name, last_name, phone, 
+          user_id, employee_id, first_name, last_name, phone, 
           department, designation, date_of_joining
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         RETURNING *
-      `, [user.id, loginId, firstName, lastName, phone, department, designation, dateOfJoining]);
+      `, [user.id, empCode, firstName, lastName, phone, department, designation, dateOfJoining]);
       const employee = empRes.rows[0];
 
       // Set Salary Structure
@@ -758,7 +768,7 @@ const resolvers = {
         SELECT e.id, e.date_of_joining, s.id as salary_structure_id, s.monthly_wage
         FROM employees e
         JOIN salary_structures s ON e.id = s.employee_id
-        WHERE s.effective_to IS NULL AND e.employment_status = 'active'
+        WHERE s.effective_to IS NULL AND e.status = 'ACTIVE'
       `);
       const employees = empRes.rows;
       const payslips = [];

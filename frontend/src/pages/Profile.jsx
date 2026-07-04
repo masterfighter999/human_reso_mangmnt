@@ -353,6 +353,23 @@ export default function Profile() {
           <p style={{ color: 'var(--muted)', marginTop: '4px' }}>
             {emp.designation || (emp.id === myEmp?.id && user?.role === 'admin' ? 'HR / Admin' : 'Staff')} &bull; {emp.department || (emp.id === myEmp?.id && user?.role === 'admin' ? 'Human Resources' : 'General')}
           </p>
+          {emp.employee_code && (
+            <span style={{
+              display: 'inline-block',
+              marginTop: '8px',
+              padding: '3px 10px',
+              background: 'var(--accent-bg)',
+              color: 'var(--accent)',
+              borderRadius: '6px',
+              fontSize: '0.82rem',
+              fontFamily: 'monospace',
+              fontWeight: '700',
+              letterSpacing: '0.05em',
+              border: '1px solid var(--accent)',
+            }}>
+              🪪 {emp.employee_code}
+            </span>
+          )}
         </div>
       </div>
 

@@ -59,11 +59,11 @@ export class AuthService {
     const passwordHash = await hashPassword(input.password);
 
     const user = await withTransaction(async (client: PoolClient) => {
-      // 1. Generate employee code (EMP-YYYY-XXXX)
-      const countResult = await client.query<{ count: string }>(
-        'SELECT COUNT(*) AS count FROM employees',
+      // 1. Generate employee code using DB sequence (race-condition-free, guaranteed unique)
+      const seqResult = await client.query<{ seq: string }>(
+        "SELECT nextval('employee_code_seq') AS seq",
       );
-      const sequence = parseInt(countResult.rows[0].count, 10) + 1;
+      const sequence = parseInt(seqResult.rows[0].seq, 10);
       const employeeCode = `EMP-${new Date().getFullYear()}-${String(sequence).padStart(4, '0')}`;
 
       // 2. Create auth identity

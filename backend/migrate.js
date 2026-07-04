@@ -1,11 +1,16 @@
 const { Client } = require('pg');
 require('dotenv').config();
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/hrms';
+// Build connection string from individual DB_* vars (same as the app server) or fall back to DATABASE_URL / local dev defaults
+const connectionString = process.env.DATABASE_URL || (
+  process.env.DB_HOST
+    ? `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT || 5432}/${process.env.DB_NAME}${process.env.DB_SSL ? '?sslmode=require' : ''}`
+    : 'postgresql://postgres:postgres@localhost:5432/hrms'
+);
 
 // Extract database name from connection string
-const dbName = connectionString.split('/').pop().split('?')[0] || 'hrms';
-// Create a connection string to the default 'postgres' database
+const dbName = (process.env.DB_NAME) || connectionString.split('/').pop().split('?')[0] || 'hrms';
+// Create a connection string to the default 'postgres' database (for CREATE DATABASE check)
 const baseConnectionString = connectionString.replace(`/${dbName}`, '/postgres');
 
 const ddl = `
@@ -17,8 +22,11 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
         CREATE TYPE user_role AS ENUM ('admin', 'employee');
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'employment_type') THEN
+        CREATE TYPE employment_type AS ENUM ('FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERN');
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'employment_status') THEN
-        CREATE TYPE employment_status AS ENUM ('active', 'on_leave', 'suspended', 'terminated');
+        CREATE TYPE employment_status AS ENUM ('ACTIVE', 'INACTIVE', 'TERMINATED', 'ON_LEAVE');
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'attendance_status') THEN
         CREATE TYPE attendance_status AS ENUM ('present', 'absent', 'half_day', 'leave');
@@ -53,7 +61,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS employees (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id           UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-    employee_code     VARCHAR(50) NOT NULL UNIQUE,
+    employee_id       VARCHAR(50) NOT NULL UNIQUE,
     first_name        VARCHAR(100) NOT NULL,
     last_name         VARCHAR(100) NOT NULL,
     phone             VARCHAR(20),
@@ -62,10 +70,11 @@ CREATE TABLE IF NOT EXISTS employees (
     department        VARCHAR(100),
     designation       VARCHAR(100),
     date_of_joining   DATE NOT NULL,
-    employment_status employment_status NOT NULL DEFAULT 'active',
+    employment_type   employment_type NOT NULL DEFAULT 'FULL_TIME',
+    status            employment_status NOT NULL DEFAULT 'ACTIVE',
     reporting_manager_id UUID REFERENCES employees(id) ON DELETE SET NULL,
     
-    -- Private Info fields from Excalidraw
+    -- Private Info fields
     date_of_birth     DATE,
     gender            VARCHAR(20),
     marital_status    VARCHAR(30),
@@ -73,7 +82,7 @@ CREATE TABLE IF NOT EXISTS employees (
     personal_email    VARCHAR(255),
     residing_address  TEXT,
     
-    -- Resume & About Me fields from Excalidraw
+    -- Resume & About Me fields
     about_me          TEXT,
     skills            JSONB,
     certifications    JSONB,
@@ -84,7 +93,10 @@ CREATE TABLE IF NOT EXISTS employees (
 );
 
 CREATE INDEX IF NOT EXISTS idx_employees_department ON employees(department);
-CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(employment_status);
+CREATE INDEX IF NOT EXISTS idx_employees_status ON employees(status);
+
+-- Sequence for unique, collision-free employee codes (EMP-YYYY-NNNN)
+CREATE SEQUENCE IF NOT EXISTS employee_code_seq START 1;
 
 -- ---------------------------------------------------------
 -- DOCUMENTS

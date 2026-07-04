@@ -7,10 +7,10 @@ const schema = buildSchema(`
   }
 
   enum EmploymentStatus {
-    active
-    on_leave
-    suspended
-    terminated
+    ACTIVE
+    INACTIVE
+    TERMINATED
+    ON_LEAVE
   }
 
   enum AttendanceStatus {
@@ -54,7 +54,7 @@ const schema = buildSchema(`
     department: String
     designation: String
     date_of_joining: String!
-    employment_status: EmploymentStatus!
+    employment_status: EmploymentStatus
     reporting_manager_id: ID
     date_of_birth: String
     gender: String
