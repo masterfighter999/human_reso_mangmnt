@@ -214,7 +214,8 @@ export default function TimeOff() {
         return 'upcoming';
       }
 
-      return 'present';
+      // Return empty string for standard days with no leave (keeps them neutral grey)
+      return '';
     });
   };
 
