@@ -832,6 +832,10 @@ const LeaveRequestResolvers = {
   leave_type: async (parent) => {
     const res = await db.query('SELECT * FROM leave_types WHERE id = $1', [parent.leave_type_id]);
     return res.rows[0] || null;
+  },
+  employee: async (parent) => {
+    const res = await db.query('SELECT * FROM employees WHERE id = $1', [parent.employee_id]);
+    return res.rows[0] || null;
   }
 };
 

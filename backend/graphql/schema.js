@@ -112,6 +112,7 @@ const schema = buildSchema(`
     updated_at: String!
     leave_type: LeaveType
     employee_name: String
+    employee: Employee
   }
 
   type LeaveBalance {

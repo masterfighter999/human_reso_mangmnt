@@ -19,16 +19,16 @@ export default function Approvals() {
     try {
       const getLeavesQuery = `
         query {
-          leaves {
+          leaveRequests(status: "pending") {
             id
             employee_id
             leave_type_id
             start_date
             end_date
-            duration
+            duration_days
             status
             remarks
-            leaveType {
+            leave_type {
               name
             }
             employee {
@@ -40,9 +40,7 @@ export default function Approvals() {
         }
       `;
       const data = await graphqlRequest(getLeavesQuery);
-      // Filter only pending leaves
-      const pending = (data.leaves || []).filter(l => l.status === 'pending');
-      setPendingLeaves(pending);
+      setPendingLeaves(data.leaveRequests || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -58,8 +56,8 @@ export default function Approvals() {
     setSuccessMsg('');
     try {
       const mutateQuery = `
-        mutation DecideLeave($id: ID!, $status: String!) {
-          updateLeaveStatus(id: $id, status: $status) {
+        mutation DecideLeave($id: ID!, $status: LeaveStatus!) {
+          reviewLeave(leaveRequestId: $id, status: $status, reviewComments: "") {
             id
             status
           }
@@ -115,9 +113,9 @@ export default function Approvals() {
                       {leave.employee?.employee_code}
                     </div>
                   </td>
-                  <td>{leave.leaveType?.name || 'Leave'}</td>
+                  <td>{leave.leave_type?.name || 'Leave'}</td>
                   <td>
-                    <span className="mono-font" style={{ fontWeight: '600' }}>{leave.duration} Days</span>
+                    <span className="mono-font" style={{ fontWeight: '600' }}>{leave.duration_days} Days</span>
                   </td>
                   <td>
                     <div style={{ fontSize: '0.85rem' }} className="mono-font">
