@@ -33,6 +33,7 @@ const LEAVE_TYPES = [
 // ─── Seed Functions ───────────────────────────────────────────────────────────
 
 async function seedAdminUser(): Promise<void> {
+  return;
   console.log('  👤  Seeding admin user...');
 
   const passwordHash = await hashPassword(ADMIN_PASSWORD);
