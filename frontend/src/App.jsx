@@ -108,7 +108,8 @@ function Header() {
 
   const getStatusText = () => {
     if (activeCheckIn) {
-      const checkInTime = new Date(activeCheckIn.check_in);
+      const rawCheckIn = activeCheckIn.check_in;
+      const checkInTime = new Date(typeof rawCheckIn === 'string' && /^\d+$/.test(rawCheckIn) ? parseInt(rawCheckIn, 10) : rawCheckIn);
       return `Checked In at ${checkInTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     }
     return 'Checked Out';

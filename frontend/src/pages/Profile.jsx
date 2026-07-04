@@ -4,6 +4,23 @@ import { AuthContext, graphqlRequest } from '../App';
 export default function Profile() {
   const { user, employee: myEmp, reloadUser, activeRole } = useContext(AuthContext);
   const [emp, setEmp] = useState(null);
+  
+  const formatProfileDate = (value) => {
+    if (!value) return '—';
+    const numericValue = typeof value === 'string' && /^\d+$/.test(value) ? parseInt(value, 10) : value;
+    const d = new Date(numericValue);
+    if (isNaN(d.getTime())) return 'Invalid Date';
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const formatInputDate = (value) => {
+    if (!value) return '';
+    const numericValue = typeof value === 'string' && /^\d+$/.test(value) ? parseInt(value, 10) : value;
+    const d = new Date(numericValue);
+    if (isNaN(d.getTime())) return '';
+    return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+  };
+
   const [activeTab, setActiveTab] = useState('view');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -121,7 +138,7 @@ export default function Profile() {
     setInterests(profile.interests || []);
 
     setPhone(profile.phone || '');
-    setDateOfBirth(profile.date_of_birth || '');
+    setDateOfBirth(formatInputDate(profile.date_of_birth));
     setGender(profile.gender || '');
     setMaritalStatus(profile.marital_status || '');
     setNationality(profile.nationality || '');
@@ -330,7 +347,7 @@ export default function Profile() {
         <div>
           <h1 style={{ fontSize: '2.5rem' }}>{emp.first_name} {emp.last_name}</h1>
           <p style={{ color: 'var(--muted)', marginTop: '4px' }}>
-            {emp.designation || 'Staff'} &bull; {emp.department || 'General'}
+            {emp.designation || (emp.id === myEmp?.id && user?.role === 'admin' ? 'HR / Admin' : 'Staff')} &bull; {emp.department || (emp.id === myEmp?.id && user?.role === 'admin' ? 'Human Resources' : 'General')}
           </p>
         </div>
       </div>
@@ -371,9 +388,9 @@ export default function Profile() {
                 <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', color: 'var(--muted)' }}>Job & System Details</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.9rem' }}>
                   <div><strong>Employee Code:</strong> <span className="mono-font">{emp.employee_code}</span></div>
-                  <div><strong>Joining Date:</strong> <span className="mono-font">{emp.date_of_joining}</span></div>
-                  <div><strong>Role Designation:</strong> {emp.designation || 'N/A'}</div>
-                  <div><strong>Department Name:</strong> {emp.department || 'N/A'}</div>
+                  <div><strong>Joining Date:</strong> <span className="mono-font">{formatProfileDate(emp.date_of_joining)}</span></div>
+                  <div><strong>Role Designation:</strong> {emp.designation || (emp.id === myEmp?.id && user?.role === 'admin' ? 'HR / Admin' : 'N/A')}</div>
+                  <div><strong>Department Name:</strong> {emp.department || (emp.id === myEmp?.id && user?.role === 'admin' ? 'Human Resources' : 'N/A')}</div>
                 </div>
               </div>
               <div>

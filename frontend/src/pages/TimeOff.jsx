@@ -18,6 +18,14 @@ export default function TimeOff() {
   const [formError, setFormError] = useState(null);
   const [formSuccess, setFormSuccess] = useState(null);
 
+  const formatDate = (value) => {
+    if (!value) return '—';
+    const numericValue = typeof value === 'string' && /^\d+$/.test(value) ? parseInt(value, 10) : value;
+    const d = new Date(numericValue);
+    if (isNaN(d.getTime())) return 'Invalid Date';
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
   // Review Modal State (Admin)
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRequestId, setReviewRequestId] = useState(null);
@@ -290,7 +298,7 @@ export default function TimeOff() {
                     <tr key={r.id}>
                       <td>{r.leave_type?.name}</td>
                       <td style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }} className="mono-font">
-                        {r.start_date} to {r.end_date}
+                        {formatDate(r.start_date)} to {formatDate(r.end_date)}
                       </td>
                       <td className="mono-font">{r.duration_days}</td>
                       <td>

@@ -6,6 +6,12 @@ export default function Approvals() {
   const [loading, setLoading] = useState(true);
   const [successMsg, setSuccessMsg] = useState('');
 
+  const formatRangeDate = (val) => {
+    if (!val) return '—';
+    const v = typeof val === 'string' && /^\d+$/.test(val) ? parseInt(val, 10) : val;
+    return new Date(v).toLocaleDateString();
+  };
+
   const fetchPendingLeaves = async () => {
     setLoading(true);
     try {
@@ -110,7 +116,7 @@ export default function Approvals() {
                   </td>
                   <td>
                     <div style={{ fontSize: '0.85rem' }} className="mono-font">
-                      {new Date(leave.start_date).toLocaleDateString()} – {new Date(leave.end_date).toLocaleDateString()}
+                      {formatRangeDate(leave.start_date)} – {formatRangeDate(leave.end_date)}
                     </div>
                   </td>
                   <td style={{ maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>

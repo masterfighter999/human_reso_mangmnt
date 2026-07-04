@@ -7,6 +7,9 @@ export default function Dashboard() {
   const { user, employee, reloadUser, activeCheckIn, handleCheckInOut, activeRole } = useContext(AuthContext);
   const navigate = useNavigate();
 
+  // Safely parse ISO strings or numeric-string timestamps from the DB
+  const parseTs = (v) => new Date(typeof v === 'string' && /^\d+$/.test(v) ? parseInt(v, 10) : v);
+
   const [employeesList, setEmployeesList] = useState([]);
   const [leavesList, setLeavesList] = useState([]);
   const [myCheckIns, setMyCheckIns] = useState([]);
@@ -254,7 +257,7 @@ export default function Dashboard() {
                 <h3 style={{ fontSize: '1.3rem' }}>{activeCheckIn ? 'Shift Active' : 'Shift Inactive'}</h3>
                 <p style={{ color: 'var(--muted)', fontSize: '0.9rem', margin: '8px 0 20px 0' }}>
                   {activeCheckIn 
-                    ? `Checked in at ${new Date(activeCheckIn.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+                    ? `Checked in at ${parseTs(activeCheckIn.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
                     : 'You have not clocked in today yet.'
                   }
                 </p>
@@ -277,10 +280,10 @@ export default function Dashboard() {
                       <div key={log.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', borderBottom: '1px solid var(--line)', paddingBottom: '8px' }}>
                         <div>
                           <div className="mono-font" style={{ fontWeight: '500' }}>
-                            {new Date(log.check_in).toLocaleDateString()}
+                            {parseTs(log.check_in).toLocaleDateString()}
                           </div>
                           <div style={{ color: 'var(--muted)', fontSize: '0.75rem' }}>
-                            {new Date(log.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {parseTs(log.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
                         <span className={`status-badge ${log.status === 'present' ? 'present' : log.status === 'half_day' ? 'half-day' : 'absent'}`}>

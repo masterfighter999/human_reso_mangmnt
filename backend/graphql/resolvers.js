@@ -260,8 +260,8 @@ const resolvers = {
       const user = userRes.rows[0];
 
       const empRes = await client.query(`
-        INSERT INTO employees (user_id, employee_code, first_name, last_name, phone, date_of_joining)
-        VALUES ($1, $2, $3, $4, $5, CURRENT_DATE)
+        INSERT INTO employees (user_id, employee_code, first_name, last_name, phone, date_of_joining, designation, department)
+        VALUES ($1, $2, $3, $4, $5, CURRENT_DATE, 'HR / Admin', 'Human Resources')
         RETURNING *
       `, [user.id, loginId, firstName, lastName, phone]);
       const employee = empRes.rows[0];

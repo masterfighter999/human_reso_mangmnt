@@ -114,9 +114,10 @@ export default function Attendance() {
     }
   };
 
-  const formatDateTime = (isoString) => {
-    if (!isoString) return '—';
-    return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const formatDateTime = (value) => {
+    if (!value) return '—';
+    const v = typeof value === 'string' && /^\d+$/.test(value) ? parseInt(value, 10) : value;
+    return new Date(v).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const getGridStatuses = () => {
@@ -126,26 +127,33 @@ export default function Attendance() {
     const month = parseInt(monthStr) - 1;
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const today = new Date();
-    
+
+    // Normalize a raw att_date value (numeric ms string or ISO string) to YYYY-MM-DD
+    const normalizeDate = (v) => {
+      if (!v) return '';
+      const d = new Date(typeof v === 'string' && /^\d+$/.test(v) ? parseInt(v, 10) : v);
+      return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+    };
+
     return Array.from({ length: daysInMonth }, (_, i) => {
       const day = i + 1;
       const dateStr = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-      const log = logs.find(l => l.att_date === dateStr);
-      
+      const log = logs.find(l => normalizeDate(l.att_date) === dateStr);
+
       if (log) {
         return log.status === 'half_day' ? 'half-day' : log.status;
       }
-      
+
       const checkDate = new Date(year, month, day);
       if (checkDate > today) {
         return 'upcoming';
       }
-      
+
       const dayOfWeek = checkDate.getDay();
       if (dayOfWeek === 0 || dayOfWeek === 6) {
         return 'upcoming'; // Rest days
       }
-      
+
       return 'absent';
     });
   };
@@ -276,7 +284,7 @@ export default function Attendance() {
                     {logs.map((log) => (
                       <tr key={log.id}>
                         {activeRole === 'admin' && !filterEmployeeId && <td>{log.employee_name}</td>}
-                        <td className="mono-font">{log.att_date}</td>
+                        <td className="mono-font">{(() => { const v = log.att_date; const d = new Date(typeof v === 'string' && /^\d+$/.test(v) ? parseInt(v, 10) : v); return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}`; })()}</td>
                         <td className="mono-font">{formatDateTime(log.check_in)}</td>
                         <td className="mono-font">{formatDateTime(log.check_out)}</td>
                         <td>{log.work_hours ? `${log.work_hours.toFixed(2)} hrs` : '—'}</td>
