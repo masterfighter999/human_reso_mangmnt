@@ -16,6 +16,7 @@ router.post('/register',       validate(registerSchema),      authController.reg
 router.post('/login',          validate(loginSchema),         authController.login);
 router.post('/refresh',        validate(refreshTokenSchema),  authController.refresh);
 router.post('/logout',         validate(refreshTokenSchema),  authController.logout);
+router.get('/verify-email',    authController.verifyEmail);
 
 // Protected routes
 router.get('/me',              authenticate,                  authController.me);

@@ -22,6 +22,13 @@ export const signAccessToken = (userId: string, email: string, role: UserRole): 
     { expiresIn: env.JWT_ACCESS_EXPIRES_IN as jwt.SignOptions['expiresIn'] },
   );
 
+export const signEmailVerificationToken = (userId: string, email: string): string =>
+  jwt.sign(
+    { sub: userId, email, role: 'employee' } satisfies Omit<JwtPayload, 'iat' | 'exp'>,
+    env.JWT_ACCESS_SECRET,
+    { expiresIn: '24h' }, // Verification link valid for 24 hours
+  );
+
 export const signRefreshToken = (userId: string, email: string, role: UserRole): string =>
   jwt.sign(
     { sub: userId, email, role } satisfies Omit<JwtPayload, 'iat' | 'exp'>,
@@ -35,6 +42,9 @@ export const generateTokenPair = (userId: string, email: string, role: UserRole)
 });
 
 export const verifyAccessToken = (token: string): JwtPayload =>
+  jwt.verify(token, env.JWT_ACCESS_SECRET) as JwtPayload;
+
+export const verifyEmailVerificationToken = (token: string): JwtPayload =>
   jwt.verify(token, env.JWT_ACCESS_SECRET) as JwtPayload;
 
 export const verifyRefreshToken = (token: string): JwtPayload =>

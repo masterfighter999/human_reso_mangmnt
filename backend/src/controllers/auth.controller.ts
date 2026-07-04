@@ -26,7 +26,7 @@ export const register = async (
 ): Promise<void> => {
   try {
     const result = await authService.register(req.body as RegisterInput);
-    sendCreated(res, result, 'Account created successfully');
+    sendCreated(res, result, 'Account created successfully. Please check your email to verify your account.');
   } catch (err) {
     next(err);
   }
@@ -102,4 +102,25 @@ export const changePassword = async (
 export const me = (req: Request, res: Response): void => {
   const user = (req as AuthenticatedRequest).user;
   sendSuccess(res, user, 'Authenticated user');
+};
+
+// ─── GET /auth/verify-email ───────────────────────────────────────────────────
+
+export const verifyEmail = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const token = req.query.token as string;
+    if (!token) {
+      res.status(400).json({ success: false, message: 'Verification token is required' });
+      return;
+    }
+    
+    await authService.verifyEmail(token);
+    sendSuccess(res, null, 'Email verified successfully. You can now log in.');
+  } catch (err) {
+    next(err);
+  }
 };

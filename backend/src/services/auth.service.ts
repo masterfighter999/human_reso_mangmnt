@@ -7,7 +7,10 @@ import {
   generateTokenPair,
   verifyRefreshToken,
   getRefreshTokenExpiry,
+  signEmailVerificationToken,
+  verifyEmailVerificationToken,
 } from '../utils/auth.util';
+import { sendVerificationEmail } from '../utils/email.util';
 import {
   ConflictError,
   UnauthorizedError,
@@ -32,7 +35,7 @@ export interface AuthUserDto {
 
 export interface AuthResult {
   user: AuthUserDto;
-  tokens: TokenPair;
+  tokens?: TokenPair;
 }
 
 // ─── AuthService ──────────────────────────────────────────────────────────────
@@ -82,17 +85,12 @@ export class AuthService {
       return newUser;
     });
 
-    // Issue tokens after the transaction succeeds
-    const tokens = generateTokenPair(user.id, user.email, user.role);
-    await this.tokenRepo.create({
-      userId: user.id,
-      token: tokens.refreshToken,
-      expiresAt: getRefreshTokenExpiry(),
-    });
+    // Send verification email
+    const verificationToken = signEmailVerificationToken(user.id, user.email);
+    await sendVerificationEmail(user.email, verificationToken);
 
     return {
       user: { id: user.id, email: user.email, role: user.role },
-      tokens,
     };
   }
 
@@ -111,6 +109,10 @@ export class AuthService {
 
     if (!user || !isValid) {
       throw new UnauthorizedError('Invalid email or password');
+    }
+
+    if (!user.email_verified) {
+      throw new UnauthorizedError('Please verify your email before logging in');
     }
 
     const tokens = generateTokenPair(user.id, user.email, user.role);
@@ -203,5 +205,27 @@ export class AuthService {
 
     // Invalidate all sessions across all devices
     await this.tokenRepo.revokeAllForUser(userId);
+  }
+
+  // ── Verify Email ───────────────────────────────────────────────────────────
+
+  async verifyEmail(token: string): Promise<void> {
+    try {
+      const payload = verifyEmailVerificationToken(token);
+      
+      const user = await this.userRepo.findById(payload.sub);
+      if (!user) {
+        throw new UnauthorizedError('Invalid verification token');
+      }
+
+      if (user.email_verified) {
+        // Already verified, just return
+        return;
+      }
+
+      await this.userRepo.setEmailVerified(user.id, true);
+    } catch (err) {
+      throw new UnauthorizedError('Invalid or expired verification token');
+    }
   }
 }
