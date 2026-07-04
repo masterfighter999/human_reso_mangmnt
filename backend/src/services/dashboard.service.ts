@@ -6,7 +6,7 @@ export class DashboardService {
   async getAdminDashboardStats(): Promise<any> {
     // 1. Employee Count
     const employeeCountRes = await query(
-      `SELECT COUNT(*) as count FROM employees WHERE employment_status = 'active'`
+      `SELECT COUNT(*) as count FROM employees WHERE employment_status = 'ACTIVE'`
     );
     const totalEmployees = parseInt(employeeCountRes.rows[0].count, 10);
 
@@ -14,13 +14,13 @@ export class DashboardService {
     // We just count the number of attendance records for today where status is not absent.
     const attendanceRes = await query(
       `SELECT COUNT(*) as count FROM attendance 
-       WHERE att_date = CURRENT_DATE AND status IN ('present', 'half_day')`
+       WHERE att_date = CURRENT_DATE AND status IN ('PRESENT', 'HALF_DAY')`
     );
     const todayAttendance = parseInt(attendanceRes.rows[0].count, 10);
 
     // 3. Pending Leave Requests
     const leaveRes = await query(
-      `SELECT COUNT(*) as count FROM leave_requests WHERE status = 'pending'`
+      `SELECT COUNT(*) as count FROM leave_requests WHERE status = 'PENDING'`
     );
     const pendingLeaves = parseInt(leaveRes.rows[0].count, 10);
 
@@ -69,7 +69,7 @@ export class DashboardService {
     // 3. Pending Leave Requests for this employee
     const leaveRes = await query(
       `SELECT COUNT(*) as count FROM leave_requests 
-       WHERE employee_id = $1 AND status = 'pending'`,
+       WHERE employee_id = $1 AND status = 'PENDING'`,
       [employee.id]
     );
     const pendingLeaves = parseInt(leaveRes.rows[0].count, 10);

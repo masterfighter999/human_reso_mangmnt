@@ -18,8 +18,8 @@ export const getProfile = async (
     const { id } = req.params;
     const { sub: userId, role } = (req as AuthenticatedRequest).user;
     
-    // Support the /profile shortcut
-    if (id === 'profile') {
+    // Support the /profile shortcut (if route is /profile, id is undefined)
+    if (!id || id === 'profile') {
       const data = await employeeService.getProfileByUserId(userId, role);
       sendSuccess(res, data, 'Profile fetched successfully');
       return;

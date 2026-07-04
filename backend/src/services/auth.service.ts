@@ -68,7 +68,6 @@ export class AuthService {
 
       // 2. Create auth identity
       const newUser = await this.userRepo.createWithClient(client, {
-        loginId: employeeCode,
         email: input.email,
         passwordHash,
         role: input.role as UserRole,
@@ -77,8 +76,8 @@ export class AuthService {
       // 3. Create linked employee profile
       await client.query(
         `INSERT INTO employees
-           (employee_code, user_id, first_name, last_name, date_of_joining, employment_status)
-         VALUES ($1, $2, $3, $4, NOW(), 'active')`,
+           (employee_id, user_id, first_name, last_name, date_of_joining, employment_type, status)
+         VALUES ($1, $2, $3, $4, NOW(), 'FULL_TIME', 'ACTIVE')`,
         [employeeCode, newUser.id, input.firstName, input.lastName],
       );
 

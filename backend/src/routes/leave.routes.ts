@@ -12,6 +12,6 @@ router.post('/', validate(applyLeaveSchema), leaveController.applyLeave);
 router.get('/', leaveController.getLeaves);
 
 // Admin only route
-router.patch('/:id/status', authorize('admin'), validate(updateLeaveStatusSchema), leaveController.updateLeaveStatus);
+router.patch('/:id/status', authorize('ADMIN'), validate(updateLeaveStatusSchema), leaveController.updateLeaveStatus);
 
 export default router;

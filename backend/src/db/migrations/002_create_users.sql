@@ -11,7 +11,9 @@ CREATE TABLE users (
   email       VARCHAR(255)  NOT NULL,
   password_hash TEXT        NOT NULL,
   role        user_role     NOT NULL DEFAULT 'EMPLOYEE',
-  is_active   BOOLEAN       NOT NULL DEFAULT TRUE,
+  email_verified BOOLEAN    NOT NULL DEFAULT FALSE,
+  email_verified_at TIMESTAMPTZ,
+  last_login_at     TIMESTAMPTZ,
   created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
 

@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext, graphqlRequest } from '../App';
+import { AuthContext } from '../App';
+import { restRequest } from '../api';
+
+// Temporary mock for removed GraphQL
+const graphqlRequest = async () => ({});
 
 export default function Employees() {
   const { user, reloadUser, activeRole } = useContext(AuthContext);

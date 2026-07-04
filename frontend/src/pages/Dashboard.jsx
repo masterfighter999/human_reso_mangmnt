@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext, graphqlRequest } from '../App';
+import { AuthContext } from '../App';
+import { restRequest } from '../api';
 import AlignmentGrid from '../components/AlignmentGrid';
 
 export default function Dashboard() {
@@ -49,60 +50,24 @@ export default function Dashboard() {
   const [employeesList, setEmployeesList] = useState([]);
   const [leavesList, setLeavesList] = useState([]);
   const [myCheckIns, setMyCheckIns] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchDashboardData = async () => {
     try {
       if (activeRole === 'admin') {
-        const adminQuery = `
-          query {
-            employees {
-              id
-              first_name
-              last_name
-              employee_code
-              designation
-              department
-              work_status
-              monthly_wage
-              profile_picture_url
-            }
-            leaveRequests {
-              id
-              status
-              start_date
-              end_date
-              duration_days
-              remarks
-              employee {
-                first_name
-                last_name
-                employee_code
-              }
-              leave_type {
-                name
-              }
-            }
-          }
-        `;
-        const data = await graphqlRequest(adminQuery);
-        setEmployeesList(data.employees || []);
-        setLeavesList(data.leaveRequests || []);
+        const stats = await restRequest('/dashboard/admin');
+        setDashboardStats(stats);
+        // Note: For a fully functioning admin dashboard we'd need endpoints for employees & leaves lists.
+        // For now we will mock the lists so the UI doesn't break, until full endpoints are implemented.
+        setEmployeesList([]); 
+        setLeavesList([]);
       } else {
-        const employeeQuery = `
-          query {
-            attendanceLogs {
-              id
-              att_date
-              check_in
-              check_out
-              work_hours
-              status
-            }
-          }
-        `;
-        const data = await graphqlRequest(employeeQuery);
-        setMyCheckIns(data.attendanceLogs || []);
+        const stats = await restRequest('/dashboard/employee');
+        setDashboardStats(stats);
+        if (stats.todayAttendance && stats.todayAttendance.check_in) {
+          setMyCheckIns([stats.todayAttendance]);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -118,11 +83,11 @@ export default function Dashboard() {
   if (!user || loading) return <div className="loading-spinner">Loading Align HRMS...</div>;
 
   // Stats Calculations
-  const headcount = employeesList.length;
-  const presentToday = employeesList.filter(emp => emp.work_status === 'present').length;
-  const pendingLeaves = leavesList.filter(l => l.status === 'pending');
-  const pendingLeavesCount = pendingLeaves.length;
-  const totalPayrollDue = employeesList.reduce((sum, emp) => sum + (emp.monthly_wage || 0), 0);
+  const headcount = dashboardStats?.totalEmployees || 0;
+  const presentToday = dashboardStats?.todayAttendance || 0;
+  const pendingLeavesCount = dashboardStats?.pendingLeaveRequests || 0;
+  const pendingLeaves = []; // Mocked until dedicated endpoint
+  const totalPayrollDue = 0; // Requires a payroll endpoint in the future
 
   // Recent activity logs for current employee
   const recentLogs = myCheckIns.slice(0, 5);

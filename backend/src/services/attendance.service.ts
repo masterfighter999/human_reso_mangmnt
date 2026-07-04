@@ -77,7 +77,7 @@ export class AttendanceService {
       targetEmployeeId = empRes.rows[0].id;
     } else {
       // Requesting someone else's attendance
-      if (role !== 'admin') {
+      if (role !== 'ADMIN') {
         const empRes = await query(`SELECT id FROM employees WHERE user_id = $1`, [userId]);
         if (empRes.rowCount === 0 || empRes.rows[0].id !== targetEmployeeId) {
           throw new BadRequestError('You can only view your own attendance');

@@ -12,7 +12,11 @@ const envSchema = z.object({
   DB_USER: z.string().default('postgres'),
   DB_PASSWORD: z.string(),
   DB_NAME: z.string().default('hrms_db'),
-  DB_SSL: z.string().default('false').transform((v) => v === 'true'),
+  // DB_SSL: z.string().default('false').transform((v) => v === 'true'),
+  DB_SSL: z
+    .string()
+    .default("false")
+    .transform((v) => ["true", "require"].includes(v.toLowerCase())),
 
   JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET must be at least 32 chars'),
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 chars'),

@@ -17,7 +17,7 @@ export const registerSchema = z.object({
   password: passwordSchema,
   firstName: z.string().trim().min(1, 'First name is required').max(50, 'First name too long'),
   lastName:  z.string().trim().min(1, 'Last name is required').max(50, 'Last name too long'),
-  role: z.enum(['admin', 'employee']).default('employee'),
+  role: z.enum(['ADMIN', 'HR', 'EMPLOYEE']).default('EMPLOYEE'),
 });
 
 export const loginSchema = z.object({

@@ -12,15 +12,15 @@ router.use(authenticate);
 // Admin / HR dashboard - Restricted to admins
 router.get(
   '/admin',
-  authorize('admin'),
+  authorize('ADMIN'),
   dashboardController.getAdminDashboard
 );
 
 // Employee dashboard - Any authenticated user (admin or employee) can view their own
-// Or you could restrict to 'employee' only: authorize('employee', 'admin')
+// Or you could restrict to 'employee' only: authorize('EMPLOYEE', 'ADMIN')
 router.get(
   '/employee',
-  authorize('admin', 'employee'),
+  authorize('ADMIN', 'EMPLOYEE'),
   dashboardController.getEmployeeDashboard
 );
 

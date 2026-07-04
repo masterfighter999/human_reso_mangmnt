@@ -17,7 +17,7 @@ export class EmployeeService {
     const employee = empRes.rows[0];
 
     // Authorization check
-    if (requesterRole !== 'admin' && employee.user_id !== requesterUserId) {
+    if (requesterRole !== 'ADMIN' && employee.user_id !== requesterUserId) {
       throw new ForbiddenError('You can only view your own profile');
     }
 
@@ -65,7 +65,7 @@ export class EmployeeService {
     const employee = empRes.rows[0];
 
     // Authorization check
-    if (requesterRole !== 'admin' && employee.user_id !== requesterUserId) {
+    if (requesterRole !== 'ADMIN' && employee.user_id !== requesterUserId) {
       throw new ForbiddenError('You can only edit your own profile');
     }
 
@@ -83,7 +83,7 @@ export class EmployeeService {
     if (data.interests !== undefined) fieldsToUpdate.interests = JSON.stringify(data.interests);
 
     // Admin only fields
-    if (requesterRole === 'admin') {
+    if (requesterRole === 'ADMIN') {
       if (data.department !== undefined) fieldsToUpdate.department = data.department;
       if (data.designation !== undefined) fieldsToUpdate.designation = data.designation;
       if (data.date_of_joining !== undefined) fieldsToUpdate.date_of_joining = data.date_of_joining;
@@ -124,7 +124,7 @@ export class EmployeeService {
     }
     const employee = empRes.rows[0];
 
-    if (requesterRole !== 'admin' && employee.user_id !== requesterUserId) {
+    if (requesterRole !== 'ADMIN' && employee.user_id !== requesterUserId) {
       throw new ForbiddenError('You can only upload documents for your own profile');
     }
 
