@@ -66,7 +66,9 @@ export default function Dashboard() {
               designation
               department
               work_status
-              monthly_wage
+              salary_structure {
+                monthly_wage
+              }
               profile_picture_url
             }
             leaveRequests {
@@ -129,7 +131,7 @@ export default function Dashboard() {
   const presentToday = employeesList.filter(emp => emp.work_status === 'present').length;
   const pendingLeaves = leavesList.filter(l => l.status === 'pending');
   const pendingLeavesCount = pendingLeaves.length;
-  const totalPayrollDue = employeesList.reduce((sum, emp) => sum + (emp.monthly_wage || 0), 0);
+  const totalPayrollDue = employeesList.reduce((sum, emp) => sum + (emp.salary_structure?.monthly_wage || 0), 0);
 
   // Recent activity logs for current employee
   const recentLogs = myCheckIns.slice(0, 5);
