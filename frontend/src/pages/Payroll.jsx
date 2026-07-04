@@ -14,7 +14,9 @@ export default function Payroll() {
 
   const formatDate = (value) => {
     if (!value) return '—';
-    const d = new Date(value);
+    const numericValue = typeof value === 'string' && /^\d+$/.test(value) ? parseInt(value, 10) : value;
+    const d = new Date(numericValue);
+    if (isNaN(d.getTime())) return 'Invalid Date';
     return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
   const [showDetailsModal, setShowDetailsModal] = useState(false);
