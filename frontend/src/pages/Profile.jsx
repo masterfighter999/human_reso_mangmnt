@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { AuthContext, graphqlRequest } from '../App';
+import { AuthContext } from '../App';
+import { restRequest } from '../api';
+
+// Temporary mock for removed GraphQL
+const graphqlRequest = async () => ({});
 
 export default function Profile() {
   const { user, employee: myEmp, reloadUser, activeRole } = useContext(AuthContext);

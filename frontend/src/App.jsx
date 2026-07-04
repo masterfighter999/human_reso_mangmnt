@@ -6,24 +6,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Link, useNavigate, us
 // Auth Context to manage state globally
 export const AuthContext = createContext();
 
-export const GRAPHQL_URL = 'http://localhost:4000/graphql';
-
-export async function graphqlRequest(query, variables = {}) {
-  const token = localStorage.getItem('token');
-  const response = await fetch(GRAPHQL_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-    },
-    body: JSON.stringify({ query, variables })
-  });
-  const result = await response.json();
-  if (result.errors) {
-    throw new Error(result.errors[0].message);
-  }
-  return result.data;
-}
+import { restRequest } from './api';
 
 // Sidebar Navigation Component
 function Sidebar() {
@@ -191,6 +174,7 @@ import TimeOff from './pages/TimeOff';
 import Payroll from './pages/Payroll';
 import Employees from './pages/Employees';
 import Approvals from './pages/Approvals';
+import VerifyEmail from './pages/VerifyEmail';
 
 function AppInner() {
   const [token, setToken] = useState(localStorage.getItem('token'));
@@ -202,55 +186,42 @@ function AppInner() {
 
   // Authenticate user on load
   const loadUser = async () => {
-    if (!token) {
+    if (!token || token === 'undefined') {
+      if (token === 'undefined') {
+        localStorage.removeItem('token');
+        setToken(null);
+      }
       setLoading(false);
       return;
     }
     try {
-      const meQuery = `
-        query {
-          me {
-            id
-            login_id
-            email
-            role
-          }
-          myProfile {
-            id
-            first_name
-            last_name
-            profile_picture_url
-            date_of_joining
-            department
-            designation
-            phone
-            address
-            date_of_birth
-            gender
-            marital_status
-            nationality
-            personal_email
-            residing_address
-            about_me
-            skills
-            certifications
-            interests
-          }
-          activeCheckIn {
-            id
-            check_in
-          }
+      // 1. Get user details
+      const user = await restRequest('/auth/me');
+      setUser(user);
+      
+      // 2. Get profile details
+      const profile = await restRequest('/employees/profile');
+      setEmployee(profile.employee);
+
+      // 3. Get today's attendance status (we fetch the employee dashboard for this)
+      try {
+        const dashboard = await restRequest('/dashboard/employee');
+        if (dashboard.todayAttendance && !dashboard.todayAttendance.check_out) {
+          setActiveCheckIn(dashboard.todayAttendance);
+        } else {
+          setActiveCheckIn(null);
         }
-      `;
-      const data = await graphqlRequest(meQuery);
-      setUser(data.me);
-      setEmployee(data.myProfile);
-      setActiveCheckIn(data.activeCheckIn);
-      if (data.me && data.me.role) {
-        setViewMode(data.me.role);
+      } catch (dashErr) {
+        console.error("Failed to load dashboard stats:", dashErr);
+        setActiveCheckIn(null);
+      }
+
+      if (user && user.role) {
+        setViewMode(user.role);
       }
     } catch (err) {
       console.error("Failed to load user:", err);
+      alert("Failed to load user: " + err.message);
       logout();
     } finally {
       setLoading(false);
@@ -282,30 +253,18 @@ function AppInner() {
   const handleCheckInOut = async () => {
     try {
       if (activeCheckIn) {
-        const checkOutMutation = `
-          mutation {
-            checkOut(remarks: "Checked out via header button") {
-              id
-              check_out
-              work_hours
-              extra_hours
-            }
-          }
-        `;
-        await graphqlRequest(checkOutMutation);
+        const data = await restRequest('/attendance/check-out', {
+          method: 'POST',
+          body: JSON.stringify({ remarks: "Checked out via header button" })
+        });
         setActiveCheckIn(null);
         notify.success('Successfully Checked Out! Have a great rest of your day.');
       } else {
-        const checkInMutation = `
-          mutation {
-            checkIn(remarks: "Checked in via header button") {
-              id
-              check_in
-            }
-          }
-        `;
-        const data = await graphqlRequest(checkInMutation);
-        setActiveCheckIn(data.checkIn);
+        const data = await restRequest('/attendance/check-in', {
+          method: 'POST',
+          body: JSON.stringify({ remarks: "Checked in via header button" })
+        });
+        setActiveCheckIn(data);
         notify.success('Successfully Checked In! Your shift has started.');
       }
       loadUser();
@@ -324,6 +283,7 @@ function AppInner() {
         <Routes>
           <Route path="/login" element={token ? <Navigate to="/" replace /> : <Login />} />
           <Route path="/signup" element={token ? <Navigate to="/" replace /> : <SignUp />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           
           <Route path="/" element={
             <ProtectedRoute>

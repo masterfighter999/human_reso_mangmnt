@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { graphqlRequest } from '../App';
+import { restRequest } from '../api';
+
+// Temporary mock for removed GraphQL
+const graphqlRequest = async () => ({});
 import { useNotification } from '../components/NotificationContext';
 
 export default function Approvals() {

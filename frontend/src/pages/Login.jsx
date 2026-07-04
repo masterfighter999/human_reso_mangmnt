@@ -1,11 +1,13 @@
 import React, { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AuthContext, graphqlRequest } from '../App';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { AuthContext } from '../App';
+import { restRequest } from '../api';
 import AlignmentGrid from '../components/AlignmentGrid';
 
 export default function Login() {
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [loginIdOrEmail, setLoginIdOrEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,33 +20,13 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const loginMutation = `
-        mutation Login($idOrEmail: String!, $password: String!) {
-          login(loginIdOrEmail: $idOrEmail, password: $password) {
-            token
-            user {
-              id
-              login_id
-              email
-              role
-            }
-            employee {
-              id
-              first_name
-              last_name
-              profile_picture_url
-            }
-          }
-        }
-      `;
-
-      const data = await graphqlRequest(loginMutation, {
-        idOrEmail: loginIdOrEmail,
-        password
+      const data = await restRequest('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: loginIdOrEmail, password })
       });
 
-      const { token, user, employee } = data.login;
-      login(token, user, employee);
+      const { accessToken } = data.tokens;
+      login(accessToken, data.user, null); // Employee data will be fetched via loadUser
       navigate('/');
     } catch (err) {
       setError(err.message || 'Incorrect Login ID or Password');
@@ -91,6 +73,12 @@ export default function Login() {
         <div className="auth-card">
           <h1 style={{ fontSize: '2.5rem', marginBottom: '8px' }}>Sign In</h1>
           <p style={{ color: 'var(--muted)', marginBottom: '32px' }}>Enter your Login ID or registered email to access your workspace.</p>
+
+          {location.state?.message && (
+            <div className="alert-banner" style={{ marginBottom: '24px', backgroundColor: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+              <span>✉️</span> {location.state.message}
+            </div>
+          )}
 
           {error && (
             <div className="alert-banner error" style={{ marginBottom: '24px' }}>

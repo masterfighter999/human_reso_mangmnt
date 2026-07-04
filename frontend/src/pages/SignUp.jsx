@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext, graphqlRequest } from '../App';
+import { AuthContext } from '../App';
+import { restRequest } from '../api';
 
 export default function SignUp() {
   const { login } = useContext(AuthContext);
@@ -26,37 +27,23 @@ export default function SignUp() {
 
     setLoading(true);
     try {
-      const registerMutation = `
-        mutation Register($company: String!, $name: String!, $email: String!, $phone: String!, $password: String!) {
-          registerAdmin(companyName: $company, name: $name, email: $email, phone: $phone, password: $password) {
-            token
-            user {
-              id
-              login_id
-              email
-              role
-            }
-            employee {
-              id
-              first_name
-              last_name
-              profile_picture_url
-            }
-          }
-        }
-      `;
+      const nameParts = name.trim().split(' ');
+      const firstName = nameParts[0] || 'Admin';
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : 'User';
 
-      const data = await graphqlRequest(registerMutation, {
-        company: companyName,
-        name,
-        email,
-        phone,
-        password
+      await restRequest('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+          password,
+          firstName,
+          lastName,
+          role: 'ADMIN'
+        })
       });
 
-      const { token, user, employee } = data.registerAdmin;
-      login(token, user, employee);
-      navigate('/');
+      // We do not auto-login because email verification is required
+      navigate('/login', { state: { message: 'Registration successful! Please check your email to verify your account before signing in.' } });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -163,6 +150,37 @@ export default function SignUp() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
               />
+              {/* Password Security Progress Bar */}
+              {password.length > 0 && (
+                <div style={{ marginTop: '8px', padding: '12px', backgroundColor: 'var(--panel)', borderRadius: '6px', border: '1px solid var(--line)' }}>
+                  <div style={{ display: 'flex', gap: '4px', marginBottom: '8px' }}>
+                    {[
+                      password.length >= 8,
+                      /[A-Z]/.test(password),
+                      /[a-z]/.test(password),
+                      /[0-9]/.test(password),
+                      /[^A-Za-z0-9]/.test(password)
+                    ].map((isMet, idx) => (
+                      <div 
+                        key={idx} 
+                        style={{ 
+                          flex: 1, 
+                          height: '4px', 
+                          borderRadius: '2px', 
+                          backgroundColor: isMet ? '#22c55e' : 'var(--line)' 
+                        }} 
+                      />
+                    ))}
+                  </div>
+                  <ul style={{ fontSize: '0.75rem', color: 'var(--muted)', paddingLeft: '16px', margin: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <li style={{ color: password.length >= 8 ? '#22c55e' : 'inherit' }}>At least 8 characters</li>
+                    <li style={{ color: /[A-Z]/.test(password) ? '#22c55e' : 'inherit' }}>One uppercase letter</li>
+                    <li style={{ color: /[a-z]/.test(password) ? '#22c55e' : 'inherit' }}>One lowercase letter</li>
+                    <li style={{ color: /[0-9]/.test(password) ? '#22c55e' : 'inherit' }}>One number</li>
+                    <li style={{ color: /[^A-Za-z0-9]/.test(password) ? '#22c55e' : 'inherit' }}>One special character</li>
+                  </ul>
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

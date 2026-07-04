@@ -16,6 +16,7 @@ export const authenticate = (req: Request, res: Response, next: NextFunction): v
   }
 
   const token = authHeader.split(' ')[1];
+  console.log("RECEIVED TOKEN:", token);
 
   try {
     const payload = verifyAccessToken(token);
