@@ -11,6 +11,12 @@ export default function Payroll() {
   });
 
   const [selectedPayslip, setSelectedPayslip] = useState(null);
+
+  const formatDate = (value) => {
+    if (!value) return '—';
+    const d = new Date(value);
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   const fetchPayslips = async () => {
@@ -150,7 +156,7 @@ export default function Payroll() {
                         <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{p.employee_code}</div>
                       </td>
                     )}
-                    <td className="mono-font" style={{ fontSize: '0.85rem' }}>{p.pay_period_start} to {p.pay_period_end}</td>
+                    <td className="mono-font" style={{ fontSize: '0.85rem' }}>{formatDate(p.pay_period_start)} to {formatDate(p.pay_period_end)}</td>
                     <td className="mono-font">{p.total_days_in_month}</td>
                     <td className="mono-font">{p.payable_days}</td>
                     <td className="mono-font">₹{p.gross_earnings.toLocaleString()}</td>
@@ -195,7 +201,7 @@ export default function Payroll() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <h3>PAYSLIP RECORD</h3>
-                  <p className="mono-font" style={{ fontSize: '0.85rem' }}>Period: {selectedPayslip.pay_period_start} to {selectedPayslip.pay_period_end}</p>
+                  <p className="mono-font" style={{ fontSize: '0.85rem' }}>Period: {formatDate(selectedPayslip.pay_period_start)} to {formatDate(selectedPayslip.pay_period_end)}</p>
                 </div>
               </div>
 
@@ -272,7 +278,7 @@ export default function Payroll() {
 
                   <div className="payslip-net-card">
                     <span style={{ fontSize: '0.8rem', color: 'var(--muted)', fontWeight: '600', textTransform: 'uppercase' }}>Net Salary Disbursed</span>
-                    <h3 className="mono-font">₹{selectedPayslip.net_pay.toLocaleString()}</h3>
+                    <h3 className="mono-font">₹{selectedPayslip.net_pay.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
                   </div>
                 </div>
               </div>

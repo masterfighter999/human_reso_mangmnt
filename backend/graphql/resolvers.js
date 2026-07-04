@@ -740,7 +740,7 @@ const resolvers = {
 
         // Deductions
         const pfDeduction = parseFloat((basicEarned * (struct.pf_rate_percent / 100)).toFixed(2));
-        const ptDeduction = struct.professional_tax; // professional tax is fixed ₹200
+        const ptDeduction = parseFloat(struct.professional_tax); // professional tax is fixed ₹200
         const totalDeductions = parseFloat((pfDeduction + ptDeduction).toFixed(2));
 
         const netPay = parseFloat((grossEarnings - totalDeductions).toFixed(2));

@@ -478,6 +478,14 @@ table.glass-table th, table.glass-table td {
   border-bottom: 1px solid var(--line);
 }
 
+table.glass-table th:first-child, table.glass-table td:first-child {
+  padding-left: 0;
+}
+
+table.glass-table th:last-child, table.glass-table td:last-child {
+  padding-right: 0;
+}
+
 table.glass-table th {
   font-weight: 600;
   color: var(--muted);
