@@ -28,7 +28,7 @@ app.use(
 // Stricter limit on auth endpoints to slow brute-force attacks.
 const authLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: 20,
+  limit: 20,
   message: { success: false, message: 'Too many requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -36,7 +36,7 @@ const authLimiter = rateLimit({
 
 const globalLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: env.RATE_LIMIT_MAX,
+  limit: env.RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
 });
