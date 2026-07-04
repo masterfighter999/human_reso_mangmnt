@@ -11,7 +11,7 @@ export class UserRepository {
 
   async findById(id: string): Promise<UserRow | null> {
     const result = await query<UserRow>(
-      `SELECT id, email, password_hash, role, is_active, created_at, updated_at
+      `SELECT id, login_id, email, password_hash, role, email_verified, email_verified_at, last_login_at, created_at, updated_at
        FROM users
        WHERE id = $1`,
       [id],
@@ -21,7 +21,7 @@ export class UserRepository {
 
   async findByEmail(email: string): Promise<UserRow | null> {
     const result = await query<UserRow>(
-      `SELECT id, email, password_hash, role, is_active, created_at, updated_at
+      `SELECT id, login_id, email, password_hash, role, email_verified, email_verified_at, last_login_at, created_at, updated_at
        FROM users
        WHERE email = $1`,
       [email],
@@ -38,13 +38,13 @@ export class UserRepository {
    */
   async createWithClient(
     client: PoolClient,
-    data: { email: string; passwordHash: string; role: UserRole },
+    data: { loginId: string; email: string; passwordHash: string; role: UserRole },
   ): Promise<UserRow> {
     const result = await client.query<UserRow>(
-      `INSERT INTO users (email, password_hash, role)
-       VALUES ($1, $2, $3)
-       RETURNING id, email, password_hash, role, is_active, created_at, updated_at`,
-      [data.email, data.passwordHash, data.role],
+      `INSERT INTO users (login_id, email, password_hash, role)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, login_id, email, password_hash, role, email_verified, email_verified_at, last_login_at, created_at, updated_at`,
+      [data.loginId, data.email, data.passwordHash, data.role],
     );
     return result.rows[0];
   }
@@ -56,10 +56,10 @@ export class UserRepository {
     );
   }
 
-  async setActive(userId: string, isActive: boolean): Promise<void> {
+  async setEmailVerified(userId: string, isVerified: boolean): Promise<void> {
     await query(
-      `UPDATE users SET is_active = $1, updated_at = NOW() WHERE id = $2`,
-      [isActive, userId],
+      `UPDATE users SET email_verified = $1, email_verified_at = NOW(), updated_at = NOW() WHERE id = $2`,
+      [isVerified, userId],
     );
   }
 }

@@ -56,26 +56,27 @@ export class AuthService {
     const passwordHash = await hashPassword(input.password);
 
     const user = await withTransaction(async (client: PoolClient) => {
-      // 1. Create auth identity
+      // 1. Generate employee code (EMP-YYYY-XXXX)
+      const countResult = await client.query<{ count: string }>(
+        'SELECT COUNT(*) AS count FROM employees',
+      );
+      const sequence = parseInt(countResult.rows[0].count, 10) + 1;
+      const employeeCode = `EMP-${new Date().getFullYear()}-${String(sequence).padStart(4, '0')}`;
+
+      // 2. Create auth identity
       const newUser = await this.userRepo.createWithClient(client, {
+        loginId: employeeCode,
         email: input.email,
         passwordHash,
         role: input.role as UserRole,
       });
 
-      // 2. Generate employee ID (EMP-YYYY-XXXX)
-      const countResult = await client.query<{ count: string }>(
-        'SELECT COUNT(*) AS count FROM employees',
-      );
-      const sequence = parseInt(countResult.rows[0].count, 10) + 1;
-      const employeeId = `EMP-${new Date().getFullYear()}-${String(sequence).padStart(4, '0')}`;
-
       // 3. Create linked employee profile
       await client.query(
         `INSERT INTO employees
-           (employee_id, user_id, first_name, last_name, date_of_joining, employment_type, status)
-         VALUES ($1, $2, $3, $4, NOW(), 'FULL_TIME', 'ACTIVE')`,
-        [employeeId, newUser.id, input.firstName, input.lastName],
+           (employee_code, user_id, first_name, last_name, date_of_joining, employment_status)
+         VALUES ($1, $2, $3, $4, NOW(), 'active')`,
+        [employeeCode, newUser.id, input.firstName, input.lastName],
       );
 
       return newUser;
@@ -108,7 +109,7 @@ export class AuthService {
     const hashToCompare = user?.password_hash ?? '$2a$12$invalidhashpaddinginvalidhash';
     const isValid = await verifyPassword(input.password, hashToCompare);
 
-    if (!user || !user.is_active || !isValid) {
+    if (!user || !isValid) {
       throw new UnauthorizedError('Invalid email or password');
     }
 
@@ -153,8 +154,8 @@ export class AuthService {
 
     // 3. Load user to get latest role (role could have changed since token was issued)
     const user = await this.userRepo.findById(payload.sub);
-    if (!user || !user.is_active) {
-      throw new UnauthorizedError('User not found or deactivated');
+    if (!user) {
+      throw new UnauthorizedError('User not found');
     }
 
     // 4. Rotate
