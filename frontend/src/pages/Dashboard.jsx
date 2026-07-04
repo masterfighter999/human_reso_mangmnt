@@ -53,49 +53,57 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const dashboardQuery = `
-        query {
-          employees {
-            id
-            first_name
-            last_name
-            employee_code
-            designation
-            department
-            work_status
-            monthly_wage
-            profile_picture_url
-          }
-          leaveRequests {
-            id
-            status
-            start_date
-            end_date
-            duration_days
-            remarks
-            employee {
+      if (activeRole === 'admin') {
+        const adminQuery = `
+          query {
+            employees {
+              id
               first_name
               last_name
               employee_code
+              designation
+              department
+              work_status
+              monthly_wage
+              profile_picture_url
             }
-            leave_type {
-              name
+            leaveRequests {
+              id
+              status
+              start_date
+              end_date
+              duration_days
+              remarks
+              employee {
+                first_name
+                last_name
+                employee_code
+              }
+              leave_type {
+                name
+              }
             }
           }
-          attendanceLogs {
-            id
-            att_date
-            check_in
-            check_out
-            work_hours
-            status
+        `;
+        const data = await graphqlRequest(adminQuery);
+        setEmployeesList(data.employees || []);
+        setLeavesList(data.leaveRequests || []);
+      } else {
+        const employeeQuery = `
+          query {
+            attendanceLogs {
+              id
+              att_date
+              check_in
+              check_out
+              work_hours
+              status
+            }
           }
-        }
-      `;
-      const data = await graphqlRequest(dashboardQuery);
-      setEmployeesList(data.employees || []);
-      setLeavesList(data.leaveRequests || []);
-      setMyCheckIns(data.attendanceLogs || []);
+        `;
+        const data = await graphqlRequest(employeeQuery);
+        setMyCheckIns(data.attendanceLogs || []);
+      }
     } catch (err) {
       console.error(err);
     } finally {
