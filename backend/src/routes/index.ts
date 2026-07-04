@@ -1,5 +1,9 @@
 import { Router, Request, Response } from 'express';
 import authRoutes from './auth.routes';
+import dashboardRoutes from './dashboard.routes';
+import employeeRoutes from './employee.routes';
+import attendanceRoutes from './attendance.routes';
+import leaveRoutes from './leave.routes';
 import { checkDbConnection } from '../config/database';
 
 const router = Router();
@@ -22,11 +26,12 @@ router.get('/health', async (_req: Request, res: Response) => {
 
 // ─── Domain Routes ────────────────────────────────────────────────────────────
 router.use('/auth', authRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 // More feature routes will be added here as we build them:
-// router.use('/employees', employeeRoutes);
-// router.use('/attendance', attendanceRoutes);
-// router.use('/leave', leaveRoutes);
+router.use('/employees', employeeRoutes);
+router.use('/attendance', attendanceRoutes);
+router.use('/leaves', leaveRoutes);
 // router.use('/payroll', payrollRoutes);
 
 export default router;

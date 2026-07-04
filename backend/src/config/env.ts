@@ -19,6 +19,8 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
+  RESEND_API_KEY: z.string().min(1, 'RESEND_API_KEY is required'),
+
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
 
   RATE_LIMIT_WINDOW_MS: z.string().default('900000').transform(Number),
