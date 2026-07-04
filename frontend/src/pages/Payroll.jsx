@@ -455,6 +455,41 @@ export default function Payroll() {
       setLoading(false);
     }
   };
+  const handleDeletePayslip = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this payslip? This action cannot be undone.")) {
+      return;
+    }
+    try {
+      const deleteMutation = `
+        mutation DeletePayslip($id: ID!) {
+          deletePayslip(id: $id)
+        }
+      `;
+      await graphqlRequest(deleteMutation, { id });
+      notify.success("Payslip deleted successfully!");
+      fetchPayslips();
+    } catch (err) {
+      notify.error(err.message || "Failed to delete payslip.");
+    }
+  };
+
+  const handleDeleteAllPayslips = async () => {
+    if (!window.confirm(`Are you sure you want to delete ALL payslips for ${selectedMonth}? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      const deleteAllMutation = `
+        mutation DeleteAllPayslips($month: String!) {
+          deletePayslipsForMonth(month: $month)
+        }
+      `;
+      await graphqlRequest(deleteAllMutation, { month: selectedMonth });
+      notify.success(`All payslips for ${selectedMonth} have been deleted.`);
+      fetchPayslips();
+    } catch (err) {
+      notify.error(err.message || "Failed to clear payslips.");
+    }
+  };
 
   /* ── Fetch employees with salary structures (admin only) ── */
   const fetchEmployeesWithSalaries = async () => {
@@ -671,6 +706,25 @@ export default function Payroll() {
                     {loading ? '⏳ Running Payroll…' : `▶ Run Payroll (${selectedMonth})`}
                   </button>
 
+                  {payslipsList.length > 0 && (
+                    <button
+                      onClick={handleDeleteAllPayslips}
+                      disabled={loading}
+                      style={{
+                        padding: '10px 24px',
+                        backgroundColor: 'transparent',
+                        border: '1px solid var(--rose)',
+                        color: 'var(--rose)',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: 600,
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      🗑 Clear All ({selectedMonth})
+                    </button>
+                  )}
+
                   <div style={{
                     marginLeft: 'auto',
                     padding: '8px 14px',
@@ -763,13 +817,32 @@ export default function Payroll() {
                           <span className="status-badge present" style={{ fontSize: '0.7rem' }}>{p.status}</span>
                         </td>
                         <td>
-                          <button
-                            className="btn-secondary"
-                            style={{ padding: '6px 12px', fontSize: '0.8rem' }}
-                            onClick={() => { setSelectedPayslip(p); setShowDetailsModal(true); }}
-                          >
-                            View Slip
-                          </button>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              className="btn-secondary"
+                              style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                              onClick={() => { setSelectedPayslip(p); setShowDetailsModal(true); }}
+                            >
+                              View Slip
+                            </button>
+                            {activeRole === 'admin' && (
+                              <button
+                                onClick={() => handleDeletePayslip(p.id)}
+                                style={{
+                                  padding: '6px 12px',
+                                  fontSize: '0.8rem',
+                                  backgroundColor: 'transparent',
+                                  border: '1px solid var(--rose)',
+                                  color: 'var(--rose)',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s'
+                                }}
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}

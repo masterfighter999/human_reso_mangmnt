@@ -277,6 +277,8 @@ const schema = buildSchema(`
 
     deleteEmployee(id: ID!): Boolean!
     withdrawLeaveRequest(id: ID!): Boolean!
+    deletePayslip(id: ID!): Boolean!
+    deletePayslipsForMonth(month: String!): Boolean!
   }
 `);
 

@@ -914,6 +914,27 @@ const resolvers = {
     // Delete the request
     await db.query('DELETE FROM leave_requests WHERE id = $1', [id]);
     return true;
+  },
+
+  deletePayslip: async ({ id }, context) => {
+    if (!context.user || context.user.role !== 'admin') {
+      throw new Error('Unauthorized: only admins can delete payslips');
+    }
+    const psRes = await db.query('SELECT 1 FROM payslips WHERE id = $1', [id]);
+    if (psRes.rowCount === 0) throw new Error('Payslip not found');
+    await db.query('DELETE FROM payslips WHERE id = $1', [id]);
+    return true;
+  },
+
+  deletePayslipsForMonth: async ({ month }, context) => {
+    if (!context.user || context.user.role !== 'admin') {
+      throw new Error('Unauthorized: only admins can delete payslips');
+    }
+    await db.query(`
+      DELETE FROM payslips 
+      WHERE to_char(pay_period_start, 'YYYY-MM') = $1
+    `, [month]);
+    return true;
   }
 };
 
