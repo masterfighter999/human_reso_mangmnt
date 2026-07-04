@@ -777,6 +777,26 @@ const resolvers = {
     } finally {
       client.release();
     }
+  },
+
+  deleteEmployee: async ({ id }, context) => {
+    if (!context.user || context.user.role !== 'admin') {
+      throw new Error('Unauthorized: only admins can remove employees');
+    }
+
+    // Fetch the employee's user_id so we can delete from users (which cascades)
+    const empRes = await db.query('SELECT user_id FROM employees WHERE id = $1', [id]);
+    if (empRes.rowCount === 0) throw new Error('Employee not found');
+    const userId = empRes.rows[0].user_id;
+
+    // Prevent an admin from accidentally deleting their own account
+    if (userId === context.user.id) {
+      throw new Error('You cannot delete your own account');
+    }
+
+    // Deleting the user cascades to employees (and any FK-linked rows)
+    await db.query('DELETE FROM users WHERE id = $1', [userId]);
+    return true;
   }
 };
 

@@ -272,6 +272,8 @@ const schema = buildSchema(`
     ): LeaveRequest!
 
     generatePayslips(month: String!): [Payslip!]!
+
+    deleteEmployee(id: ID!): Boolean!
   }
 `);
 

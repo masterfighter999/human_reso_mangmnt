@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AuthContext, graphqlRequest } from '../App';
 
 export default function Employees() {
-  const { user, reloadUser } = useContext(AuthContext);
+  const { user, reloadUser, activeRole } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const [employeesList, setEmployeesList] = useState([]);
@@ -119,6 +119,17 @@ export default function Employees() {
     }
   };
 
+  const handleDeleteEmployee = async (emp, e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Remove ${emp.first_name} ${emp.last_name} (${emp.employee_code}) from the system?\n\nThis will permanently delete their account, attendance, payslips, and leave records.`)) return;
+    try {
+      await graphqlRequest(`mutation Del($id: ID!) { deleteEmployee(id: $id) }`, { id: emp.id });
+      fetchEmployees();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const filteredEmployees = employeesList.filter((emp) => {
     const fullName = `${emp.first_name} ${emp.last_name}`.toLowerCase();
     return (
@@ -153,10 +164,19 @@ export default function Employees() {
       <div className="grid-3">
         {filteredEmployees.map((emp) => (
           <div key={emp.id} className="card" onClick={() => navigate(`/profile?id=${emp.id}`)} style={{ cursor: 'pointer', position: 'relative' }}>
-            <div style={{ position: 'absolute', top: '16px', right: '16px' }}>
+            <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', gap: '8px', alignItems: 'center' }}>
               <span className={`status-badge ${emp.work_status === 'present' ? 'present' : emp.work_status === 'leave' ? 'leave' : 'absent'}`}>
                 {emp.work_status}
               </span>
+              {activeRole === 'admin' && (
+                <button
+                  onClick={(e) => handleDeleteEmployee(emp, e)}
+                  title="Remove employee"
+                  style={{ background: 'none', border: '1px solid var(--rose)', color: 'var(--rose)', borderRadius: '4px', padding: '2px 8px', fontSize: '0.75rem', cursor: 'pointer', lineHeight: '1.4' }}
+                >
+                  ✕
+                </button>
+              )}
             </div>
             <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '16px' }}>
               <img 
