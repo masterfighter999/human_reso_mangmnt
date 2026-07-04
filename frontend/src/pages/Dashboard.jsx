@@ -52,50 +52,65 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   const fetchDashboardData = async () => {
+    if (!user) return;
+    setLoading(true);
     try {
-      const dashboardQuery = `
-        query {
-          employees {
-            id
-            first_name
-            last_name
-            employee_code
-            designation
-            department
-            work_status
-            monthly_wage
-            profile_picture_url
-          }
-          leaves {
-            id
-            status
-            start_date
-            end_date
-            duration
-            remarks
-            employee {
+      if (activeRole === 'admin') {
+        const adminQuery = `
+          query {
+            employees {
+              id
               first_name
               last_name
               employee_code
+              designation
+              department
+              work_status
+              monthly_wage
+              profile_picture_url
             }
-            leaveType {
-              name
+            leaveRequests {
+              id
+              status
+              start_date
+              end_date
+              duration_days
+              remarks
+              employee {
+                first_name
+                last_name
+                employee_code
+              }
+              leave_type {
+                name
+              }
             }
           }
-          attendanceLogs {
-            id
-            att_date
-            check_in
-            check_out
-            work_hours
-            status
+        `;
+        const data = await graphqlRequest(adminQuery);
+        setEmployeesList(data.employees || []);
+        setLeavesList(data.leaveRequests || []);
+        setMyCheckIns([]);
+      } else {
+        const employeeQuery = `
+          query GetEmployeeDashboard($employeeId: ID) {
+            attendanceLogs(employeeId: $employeeId) {
+              id
+              att_date
+              check_in
+              check_out
+              work_hours
+              status
+            }
           }
-        }
-      `;
-      const data = await graphqlRequest(dashboardQuery);
-      setEmployeesList(data.employees || []);
-      setLeavesList(data.leaves || []);
-      setMyCheckIns(data.attendanceLogs || []);
+        `;
+        const data = await graphqlRequest(employeeQuery, {
+          employeeId: employee?.id || null
+        });
+        setEmployeesList([]);
+        setLeavesList([]);
+        setMyCheckIns(data.attendanceLogs || []);
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -227,7 +242,7 @@ export default function Dashboard() {
                       <div>
                         <strong>{leave.employee ? `${leave.employee.first_name} ${leave.employee.last_name}` : 'Staff'}</strong>
                         <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
-                          Applied for {leave.leaveType?.name} ({leave.duration} days)
+                          Applied for {leave.leave_type?.name} ({leave.duration_days} days)
                         </div>
                       </div>
                       <span className="status-badge pending" style={{ textTransform: 'none' }}>
