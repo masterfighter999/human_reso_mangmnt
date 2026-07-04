@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext, graphqlRequest } from '../App';
+import AlignmentGrid from '../components/AlignmentGrid';
 
 export default function TimeOff() {
-  const { user, employee, reloadUser } = useContext(AuthContext);
+  const { user, employee, reloadUser, activeRole } = useContext(AuthContext);
   const [balances, setBalances] = useState([]);
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Leave Form State
+  // Form State
   const [selectedLeaveTypeId, setSelectedLeaveTypeId] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -26,7 +27,6 @@ export default function TimeOff() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Get leave balances
       const getBalancesQuery = `
         query {
           leaveBalances {
@@ -64,11 +64,11 @@ export default function TimeOff() {
         }
       `;
       const data = await graphqlRequest(getBalancesQuery);
-      setBalances(data.leaveBalances);
-      setLeaveTypes(data.leaveTypes);
-      setRequests(data.leaveRequests);
+      setBalances(data.leaveBalances || []);
+      setLeaveTypes(data.leaveTypes || []);
+      setRequests(data.leaveRequests || []);
 
-      if (data.leaveTypes.length > 0 && !selectedLeaveTypeId) {
+      if (data.leaveTypes && data.leaveTypes.length > 0 && !selectedLeaveTypeId) {
         setSelectedLeaveTypeId(data.leaveTypes[0].id);
       }
     } catch (err) {
@@ -80,14 +80,13 @@ export default function TimeOff() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [activeRole]);
 
   const handleApplyLeave = async (e) => {
     e.preventDefault();
     setFormError(null);
     setFormSuccess(null);
 
-    // Basic date validations
     const start = new Date(startDate);
     const end = new Date(endDate);
     if (end < start) {
@@ -97,7 +96,6 @@ export default function TimeOff() {
 
     const durationDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
-    // Check balances
     const activeBalance = balances.find(b => b.leave_type_id === selectedLeaveTypeId);
     if (activeBalance && activeBalance.leave_category !== 'unpaid') {
       if (durationDays > activeBalance.days_available) {
@@ -173,36 +171,28 @@ export default function TimeOff() {
     }
   };
 
-  const getBalanceCardClass = (category) => {
-    if (category === 'paid') return 'paid';
-    if (category === 'sick') return 'sick';
-    return 'unpaid';
-  };
-
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div>
-          <h1>Time Off / Leave Management</h1>
-          <p className="subtitle">Manage leave balances and time off workflows</p>
-        </div>
+      <div style={{ marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '2.5rem' }}>Time Off & Leave balances</h1>
+        <p style={{ color: 'var(--muted)', marginTop: '4px' }}>Manage balances and request time off workflows</p>
       </div>
 
       {loading ? (
         <div className="loading-spinner">Loading Leave Module...</div>
       ) : (
         <div>
-          {/* Leave Balances Header Cards (Only visible to employee or filters) */}
-          <div className="leave-balances-row">
+          {/* Leave Balances Header Cards */}
+          <div className="grid-3" style={{ marginBottom: '32px' }}>
             {balances.map((b) => (
-              <div key={b.leave_type_id} className={`glass-card balance-card ${getBalanceCardClass(b.leave_category)}`}>
-                <h3>{b.leave_type_name}</h3>
-                <div className="balance-num">
+              <div key={b.leave_type_id} className="card">
+                <div className="stat-title">{b.leave_type_name}</div>
+                <div className="stat-value" style={{ color: b.leave_category === 'sick' ? 'var(--amber)' : b.leave_category === 'paid' ? 'var(--accent)' : 'var(--ink)' }}>
                   {b.leave_category === 'unpaid' ? b.days_taken : b.days_available}
                 </div>
-                <p style={{ color: 'var(--text-secondary)' }}>
+                <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '4px' }}>
                   {b.leave_category === 'unpaid' 
-                    ? `${b.days_taken} days taken` 
+                    ? `${b.days_taken} days taken (unpaid)` 
                     : `${b.days_taken} of ${b.max_days} days taken`
                   }
                 </p>
@@ -210,167 +200,120 @@ export default function TimeOff() {
             ))}
           </div>
 
-          <div className="leave-split-layout">
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: '32px' }}>
             {/* 1. Request leave Form */}
-            <div className="glass-card" style={{ height: 'fit-content' }}>
-              <h2>Request Time Off</h2>
-              <hr style={{ borderColor: 'rgba(255,255,255,0.08)', margin: '16px 0' }} />
+            <div>
+              <div className="card">
+                <h2 style={{ fontSize: '1.4rem', marginBottom: '16px' }}>Request Time Off</h2>
+                <hr style={{ borderColor: 'var(--line)', margin: '12px 0 20px 0' }} />
 
-              <form onSubmit={handleApplyLeave}>
-                {formError && <div className="alert-banner error" style={{ marginBottom: '16px' }}>{formError}</div>}
-                {formSuccess && <div className="alert-banner success" style={{ marginBottom: '16px' }}>{formSuccess}</div>}
+                <form onSubmit={handleApplyLeave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {formError && <div className="alert-banner error">{formError}</div>}
+                  {formSuccess && <div className="alert-banner success">{formSuccess}</div>}
 
-                <div className="form-group">
-                  <label>Leave Type</label>
-                  <select 
-                    value={selectedLeaveTypeId} 
-                    onChange={(e) => setSelectedLeaveTypeId(e.target.value)}
-                    required
-                  >
-                    {leaveTypes.map(t => (
-                      <option key={t.id} value={t.id}>{t.name} (Max {t.max_days_per_year || 'Unlimited'} Days)</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
-                  <div>
-                    <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Start Date</label>
-                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Leave Type</label>
+                    <select 
+                      value={selectedLeaveTypeId} 
+                      onChange={(e) => setSelectedLeaveTypeId(e.target.value)}
+                      required
+                    >
+                      {leaveTypes.map(t => (
+                        <option key={t.id} value={t.id}>{t.name} (Max {t.max_days_per_year || 'Unlimited'} Days)</option>
+                      ))}
+                    </select>
                   </div>
-                  <div>
-                    <label style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>End Date</label>
-                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Start Date</label>
+                      <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>End Date</label>
+                      <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
+                    </div>
                   </div>
-                </div>
 
-                <div className="form-group">
-                  <label>Remarks / Reason</label>
-                  <textarea 
-                    rows="3" 
-                    placeholder="Provide details about your time off request..."
-                    value={remarks}
-                    onChange={(e) => setRemarks(e.target.value)}
-                    required
-                  />
-                </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Remarks / Reason</label>
+                    <textarea 
+                      rows="3" 
+                      placeholder="Remarks..."
+                      value={remarks}
+                      onChange={(e) => setRemarks(e.target.value)}
+                      required
+                    />
+                  </div>
 
-                <div className="form-group">
-                  <label>Attachment URL (Optional, required for sick leave certificates)</label>
-                  <input 
-                    type="url" 
-                    placeholder="https://example.com/certificate.pdf"
-                    value={attachmentUrl}
-                    onChange={(e) => setAttachmentUrl(e.target.value)}
-                  />
-                </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Attachment URL (Optional)</label>
+                    <input 
+                      type="url" 
+                      placeholder="https://example.com/doc.pdf"
+                      value={attachmentUrl}
+                      onChange={(e) => setAttachmentUrl(e.target.value)}
+                    />
+                  </div>
 
-                <button type="submit" className="btn-primary">
-                  Submit Leave Request
-                </button>
-              </form>
+                  <button type="submit" className="btn-primary">
+                    Submit Leave Request
+                  </button>
+                </form>
+              </div>
             </div>
 
-            {/* 2. Requests log */}
-            <div className="glass-card">
-              <h2>Leave History & Approvals</h2>
-              <hr style={{ borderColor: 'rgba(255,255,255,0.08)', margin: '16px 0' }} />
+            {/* 2. Calendar Card & History table */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+              <div className="card">
+                <h2 style={{ fontSize: '1.4rem', marginBottom: '16px' }}>Leave Calendar</h2>
+                <hr style={{ borderColor: 'var(--line)', margin: '12px 0 20px 0' }} />
+                <AlignmentGrid />
+              </div>
 
-              <div style={{ overflowX: 'auto' }}>
-                <table className="glass-table">
-                  <thead>
-                    <tr>
-                      {user?.role === 'admin' && <th>Employee</th>}
-                      <th>Type</th>
-                      <th>Period</th>
-                      <th>Days</th>
-                      <th>Status</th>
-                      {user?.role === 'admin' ? <th>Action</th> : <th>Approver Notes</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {requests.map((r) => (
-                      <tr key={r.id}>
-                        {user?.role === 'admin' && <td>{r.employee_name}</td>}
-                        <td>{r.leave_type?.name}</td>
-                        <td style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }}>
-                          {r.start_date} to {r.end_date}
-                        </td>
-                        <td>{r.duration_days}</td>
-                        <td>
-                          <span className={`status-badge ${r.status}`}>{r.status}</span>
-                        </td>
-                        <td>
-                          {user?.role === 'admin' ? (
-                            r.status === 'pending' ? (
-                              <button 
-                                className="btn-primary" 
-                                style={{ width: 'auto', padding: '6px 14px', fontSize: '0.8rem' }}
-                                onClick={() => { setReviewRequestId(r.id); setReviewStatus('approved'); setShowReviewModal(true); }}
-                              >
-                                Review
-                              </button>
-                            ) : (
-                              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Reviewed</span>
-                            )
-                          ) : (
-                            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                              {r.review_comments || 'No comments'}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                    {requests.length === 0 && (
+              <div className="card">
+                <h2 style={{ fontSize: '1.4rem', marginBottom: '16px' }}>My Leave Applications</h2>
+                <hr style={{ borderColor: 'var(--line)', margin: '12px 0 20px 0' }} />
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="glass-table">
+                    <thead>
                       <tr>
-                        <td colSpan={user?.role === 'admin' ? 6 : 5} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
-                          No leave applications recorded.
-                        </td>
+                        <th>Type</th>
+                        <th>Period</th>
+                        <th>Days</th>
+                        <th>Status</th>
+                        <th>Reviewer Notes</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {requests.map((r) => (
+                        <tr key={r.id}>
+                          <td>{r.leave_type?.name}</td>
+                          <td style={{ fontSize: '0.85rem', whiteSpace: 'nowrap' }} className="mono-font">
+                            {r.start_date} to {r.end_date}
+                          </td>
+                          <td className="mono-font">{r.duration_days}</td>
+                          <td>
+                            <span className={`status-badge ${r.status}`}>{r.status}</span>
+                          </td>
+                          <td style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
+                            {r.review_comments || 'No comments'}
+                          </td>
+                        </tr>
+                      ))}
+                      {requests.length === 0 && (
+                        <tr>
+                          <td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)' }}>
+                            No leave applications recorded.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Review Modal (Admin-Only) */}
-      {showReviewModal && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-panel" style={{ maxWidth: '450px' }}>
-            <h2>Review Leave Application</h2>
-            <hr style={{ borderColor: 'rgba(255,255,255,0.1)', margin: '16px 0' }} />
-
-            <form onSubmit={handleReviewLeaveSubmit}>
-              <div className="form-group">
-                <label>Review Decision</label>
-                <select value={reviewStatus} onChange={(e) => setReviewStatus(e.target.value)}>
-                  <option value="approved">Approve</option>
-                  <option value="rejected">Reject</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Review Comments</label>
-                <textarea 
-                  rows="3" 
-                  placeholder="Add approval or rejection remarks..."
-                  value={reviewComments}
-                  onChange={(e) => setReviewComments(e.target.value)}
-                />
-              </div>
-
-              <div className="modal-footer">
-                <button type="button" className="btn-secondary" onClick={() => setShowReviewModal(false)} style={{ marginRight: '8px' }}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary" style={{ width: 'auto', padding: '0 24px' }}>
-                  Submit Decision
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

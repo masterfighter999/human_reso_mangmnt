@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext, graphqlRequest } from '../App';
+import AlignmentGrid from '../components/AlignmentGrid';
 
 export default function Attendance() {
-  const { user, employee, activeCheckIn, handleCheckInOut } = useContext(AuthContext);
+  const { user, employee, activeCheckIn, handleCheckInOut, activeRole } = useContext(AuthContext);
   const [logs, setLogs] = useState([]);
   const [remarks, setRemarks] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -10,10 +11,10 @@ export default function Attendance() {
     return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}`;
   });
   
-  // Admin-only filter
   const [filterEmployeeId, setFilterEmployeeId] = useState('');
   const [employeesList, setEmployeesList] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [activeTab, setActiveTab] = useState('monthly'); // 'monthly' or 'weekly'
 
   const fetchAttendanceLogs = async () => {
     setLoadingLogs(true);
@@ -34,10 +35,10 @@ export default function Attendance() {
         }
       `;
       const data = await graphqlRequest(getLogsQuery, {
-        empId: filterEmployeeId || null,
+        empId: (activeRole === 'admin' ? filterEmployeeId : null) || null,
         month: selectedMonth
       });
-      setLogs(data.attendanceLogs);
+      setLogs(data.attendanceLogs || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -58,7 +59,7 @@ export default function Attendance() {
         }
       `;
       const data = await graphqlRequest(getEmpsQuery);
-      setEmployeesList(data.employees);
+      setEmployeesList(data.employees || []);
     } catch (err) {
       console.error(err);
     }
@@ -66,7 +67,7 @@ export default function Attendance() {
 
   useEffect(() => {
     fetchAttendanceLogs();
-  }, [filterEmployeeId, selectedMonth, activeCheckIn]);
+  }, [filterEmployeeId, selectedMonth, activeCheckIn, activeRole]);
 
   useEffect(() => {
     if (user?.role === 'admin') {
@@ -74,7 +75,6 @@ export default function Attendance() {
     }
   }, [user]);
 
-  // Check In/Out custom handlers that take optional remarks input
   const onCheckInSubmit = async () => {
     try {
       const checkInMutation = `
@@ -88,7 +88,7 @@ export default function Attendance() {
       await graphqlRequest(checkInMutation, { rem: remarks });
       setRemarks('');
       alert('Successfully Checked In!');
-      window.location.reload(); // Refresh session variables
+      window.location.reload();
     } catch (err) {
       alert(err.message);
     }
@@ -108,7 +108,7 @@ export default function Attendance() {
       await graphqlRequest(checkOutMutation, { rem: remarks });
       setRemarks('');
       alert('Successfully Checked Out!');
-      window.location.reload(); // Refresh session variables
+      window.location.reload();
     } catch (err) {
       alert(err.message);
     }
@@ -119,125 +119,189 @@ export default function Attendance() {
     return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const getGridStatuses = () => {
+    if (!selectedMonth) return [];
+    const [yearStr, monthStr] = selectedMonth.split('-');
+    const year = parseInt(yearStr);
+    const month = parseInt(monthStr) - 1;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+    
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const day = i + 1;
+      const dateStr = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+      const log = logs.find(l => l.att_date === dateStr);
+      
+      if (log) {
+        return log.status === 'half_day' ? 'half-day' : log.status;
+      }
+      
+      const checkDate = new Date(year, month, day);
+      if (checkDate > today) {
+        return 'upcoming';
+      }
+      
+      const dayOfWeek = checkDate.getDay();
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        return 'upcoming'; // Rest days
+      }
+      
+      return 'absent';
+    });
+  };
+
+  const gridStatuses = getGridStatuses();
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
-          <h1>Attendance Tracking</h1>
-          <p className="subtitle">Clock in daily shifts and monitor time-card logs</p>
+          <h1 style={{ fontSize: '2.5rem' }}>Attendance & Shift Log</h1>
+          <p style={{ color: 'var(--muted)', marginTop: '4px' }}>
+            Scope:{' '}
+            <strong style={{ color: 'var(--ink)' }}>
+              {activeRole === 'admin' ? 'All Employees' : 'Personal Records'}
+            </strong>
+          </p>
         </div>
       </div>
 
-      <div className="attendance-grid">
-        {/* Left Side: Check In controls */}
-        <div className="glass-card" style={{ height: 'fit-content' }}>
-          <h2>Shift Action</h2>
-          <hr style={{ borderColor: 'rgba(255,255,255,0.08)', margin: '16px 0' }} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.2fr', gap: '32px' }}>
+        {/* Left Side: Shift Clock Card */}
+        <div>
+          <div className="card">
+            <h2 style={{ fontSize: '1.4rem', marginBottom: '16px' }}>Shift Clock Widget</h2>
+            <hr style={{ borderColor: 'var(--line)', margin: '12px 0 20px 0' }} />
 
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', margin: '20px 0' }}>
-            <div style={{ width: '70px', height: '70px', borderRadius: '50%', background: activeCheckIn ? 'var(--success-bg)' : 'var(--warning-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '2.2rem', marginBottom: '12px' }}>
-              {activeCheckIn ? '🟢' : '⚪'}
-            </div>
-            <h3>{activeCheckIn ? 'Working Since' : 'Currently Checked Out'}</h3>
-            {activeCheckIn && (
-              <span style={{ fontSize: '1.2rem', fontWeight: '700', marginTop: '6px', color: 'var(--success)' }}>
-                {new Date(activeCheckIn.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label>Daily Remarks / Notes</label>
-            <input 
-              type="text" 
-              placeholder="e.g. Remote work, client meeting..." 
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-            />
-          </div>
-
-          <button 
-            className="btn-primary" 
-            style={{ background: activeCheckIn ? 'var(--danger)' : 'var(--success)', color: '#fff' }}
-            onClick={activeCheckIn ? onCheckOutSubmit : onCheckInSubmit}
-          >
-            {activeCheckIn ? 'Check Out Now' : 'Check In Now'}
-          </button>
-        </div>
-
-        {/* Right Side: Attendance Logs */}
-        <div className="glass-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
-            <h2>Attendance History</h2>
-            
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              {user?.role === 'admin' && (
-                <select 
-                  value={filterEmployeeId} 
-                  onChange={(e) => setFilterEmployeeId(e.target.value)}
-                  style={{ width: '180px', padding: '8px 12px' }}
-                >
-                  <option value="">All Employees</option>
-                  {employeesList.map(e => (
-                    <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>
-                  ))}
-                </select>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', margin: '16px 0 24px 0' }}>
+              <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: activeCheckIn ? 'var(--accent-bg)' : 'var(--amber-bg)', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.8rem', marginBottom: '12px' }}>
+                {activeCheckIn ? '🟢' : '⚪'}
+              </div>
+              <h3 style={{ fontSize: '1.25rem' }}>{activeCheckIn ? 'Shift Active' : 'Shift Offline'}</h3>
+              {activeCheckIn && (
+                <span className="mono-font" style={{ fontSize: '1.1rem', fontWeight: '600', marginTop: '6px', color: 'var(--accent)' }}>
+                  Clocked In: {formatDateTime(activeCheckIn.check_in)}
+                </span>
               )}
-              
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px' }}>
+              <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Shift Shift Remarks</label>
               <input 
-                type="month" 
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                style={{ width: '160px', padding: '8px 12px' }}
+                type="text" 
+                placeholder="e.g. In office, remote, client call..." 
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                style={{ width: '100%' }}
               />
             </div>
-          </div>
 
-          {loadingLogs ? (
-            <p>Loading attendance logs...</p>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="glass-table">
-                <thead>
-                  <tr>
-                    {user?.role === 'admin' && !filterEmployeeId && <th>Employee</th>}
-                    <th>Date</th>
-                    <th>Check In</th>
-                    <th>Check Out</th>
-                    <th>Work Hours</th>
-                    <th>Extra Hours</th>
-                    <th>Status</th>
-                    <th>Remarks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logs.map((log) => (
-                    <tr key={log.id}>
-                      {user?.role === 'admin' && !filterEmployeeId && <td>{log.employee_name}</td>}
-                      <td>{log.att_date}</td>
-                      <td>{formatDateTime(log.check_in)}</td>
-                      <td>{formatDateTime(log.check_out)}</td>
-                      <td>{log.work_hours ? `${log.work_hours} hrs` : '—'}</td>
-                      <td style={{ color: log.extra_hours > 0 ? 'var(--success)' : 'inherit' }}>
-                        {log.extra_hours > 0 ? `+${log.extra_hours} hrs` : '—'}
-                      </td>
-                      <td>
-                        <span className={`status-dot ${log.status}`}></span> {log.status}
-                      </td>
-                      <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{log.remarks || '—'}</td>
-                    </tr>
-                  ))}
-                  {logs.length === 0 && (
-                    <tr>
-                      <td colSpan={user?.role === 'admin' ? 8 : 7} style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
-                        No attendance records found for this period.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+            <button 
+              className="btn-primary" 
+              style={{ width: '100%', backgroundColor: activeCheckIn ? 'var(--rose)' : 'var(--accent)' }}
+              onClick={activeCheckIn ? onCheckOutSubmit : onCheckInSubmit}
+            >
+              {activeCheckIn ? 'Check Out' : 'Check In'}
+            </button>
+          </div>
+        </div>
+
+        {/* Right Side: Tabbed History view */}
+        <div>
+          <div className="card">
+            {/* Header controls */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+              <div className="tabs-container" style={{ margin: 0, border: 'none' }}>
+                <button 
+                  className={`tab-btn ${activeTab === 'monthly' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('monthly')}
+                >
+                  Monthly Grid
+                </button>
+                <button 
+                  className={`tab-btn ${activeTab === 'weekly' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('weekly')}
+                >
+                  Detailed Log
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                {activeRole === 'admin' && (
+                  <select 
+                    value={filterEmployeeId} 
+                    onChange={(e) => setFilterEmployeeId(e.target.value)}
+                    style={{ padding: '8px 12px', fontSize: '0.85rem', width: '160px' }}
+                  >
+                    <option value="">All Employees</option>
+                    {employeesList.map(e => (
+                      <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>
+                    ))}
+                  </select>
+                )}
+                
+                <input 
+                  type="month" 
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  style={{ padding: '8px 12px', fontSize: '0.85rem', width: '150px' }}
+                />
+              </div>
             </div>
-          )}
+
+            {loadingLogs ? (
+              <p style={{ textAlign: 'center', color: 'var(--muted)', padding: '24px 0' }}>Loading logs...</p>
+            ) : activeTab === 'monthly' ? (
+              /* MONTHLY ALIGNMENT GRID VIEW */
+              <div style={{ padding: '12px 0' }}>
+                <h3 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>Monthly Status Heatmap</h3>
+                <AlignmentGrid statusList={gridStatuses} size={gridStatuses.length} />
+              </div>
+            ) : (
+              /* DETAILED LOG TABLE VIEW */
+              <div style={{ overflowX: 'auto' }}>
+                <table className="glass-table">
+                  <thead>
+                    <tr>
+                      {activeRole === 'admin' && !filterEmployeeId && <th>Employee</th>}
+                      <th>Date</th>
+                      <th>Check In</th>
+                      <th>Check Out</th>
+                      <th>Work Hours</th>
+                      <th>Extra Hours</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.map((log) => (
+                      <tr key={log.id}>
+                        {activeRole === 'admin' && !filterEmployeeId && <td>{log.employee_name}</td>}
+                        <td className="mono-font">{log.att_date}</td>
+                        <td className="mono-font">{formatDateTime(log.check_in)}</td>
+                        <td className="mono-font">{formatDateTime(log.check_out)}</td>
+                        <td>{log.work_hours ? `${log.work_hours.toFixed(2)} hrs` : '—'}</td>
+                        <td style={{ color: log.extra_hours > 0 ? 'var(--accent)' : 'inherit' }}>
+                          {log.extra_hours > 0 ? `+${log.extra_hours.toFixed(2)} hrs` : '—'}
+                        </td>
+                        <td>
+                          <span className={`status-badge ${log.status === 'half_day' ? 'half-day' : log.status}`}>
+                            {log.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                    {logs.length === 0 && (
+                      <tr>
+                        <td colSpan={activeRole === 'admin' && !filterEmployeeId ? 7 : 6} style={{ textAlign: 'center', color: 'var(--muted)' }}>
+                          No shift logs found for this period.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

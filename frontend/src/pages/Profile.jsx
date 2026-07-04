@@ -2,19 +2,19 @@ import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext, graphqlRequest } from '../App';
 
 export default function Profile() {
-  const { user, employee: myEmp, reloadUser } = useContext(AuthContext);
+  const { user, employee: myEmp, reloadUser, activeRole } = useContext(AuthContext);
   const [emp, setEmp] = useState(null);
-  const [activeTab, setActiveTab] = useState('resume');
+  const [activeTab, setActiveTab] = useState('view');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [successMsg, setSuccessMsg] = useState(null);
 
-  // Get employee ID from URL query parameters (for Admin)
+  // Get employee ID from URL query parameters (for Admin viewing others)
   const queryParams = new URLSearchParams(window.location.search);
   const employeeId = queryParams.get('id');
-  const isAdminViewingOther = user?.role === 'admin' && employeeId && employeeId !== myEmp?.id;
+  const isAdminViewingOther = activeRole === 'admin' && employeeId && employeeId !== myEmp?.id;
 
-  // Form Fields - Resume Tab
+  // Form Fields - Resume / Edit Tab
   const [aboutMe, setAboutMe] = useState('');
   const [skills, setSkills] = useState([]);
   const [newSkill, setNewSkill] = useState('');
@@ -37,7 +37,7 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Form Fields - Salary Info (Admin-Only)
+  // Form Fields - Salary Info (Admin-Only Edit)
   const [workingDaysWeek, setWorkingDaysWeek] = useState(5);
   const [breakTimeMins, setBreakTimeMins] = useState(60);
   const [bankName, setBankName] = useState('');
@@ -52,7 +52,6 @@ export default function Profile() {
     setError(null);
     try {
       if (isAdminViewingOther) {
-        // Fetch specific employee (including salary details)
         const getEmpQuery = `
           query GetEmployee($id: ID!) {
             employee(id: $id) {
@@ -92,8 +91,6 @@ export default function Profile() {
                 performance_bonus
                 lta
                 fixed_allowance
-                pf_rate_percent
-                professional_tax
               }
             }
           }
@@ -106,7 +103,6 @@ export default function Profile() {
           setError("Employee not found");
         }
       } else {
-        // Use my own profile
         setEmp(myEmp);
         populateFormStates(myEmp);
       }
@@ -148,8 +144,8 @@ export default function Profile() {
     fetchProfile();
   }, [employeeId, myEmp]);
 
-  // Handle Updates
-  const handleUpdateProfile = async (tab) => {
+  const handleUpdateProfileSubmit = async (e) => {
+    e.preventDefault();
     setError(null);
     setSuccessMsg(null);
 
@@ -184,13 +180,11 @@ export default function Profile() {
             interests: $interests
           ) {
             id
-            first_name
-            last_name
           }
         }
       `;
 
-      const variables = {
+      await graphqlRequest(updateMutation, {
         id: isAdminViewingOther ? employeeId : null,
         phone,
         dob: dateOfBirth,
@@ -203,12 +197,11 @@ export default function Profile() {
         skills,
         certs: certifications,
         interests
-      };
+      });
 
-      await graphqlRequest(updateMutation, variables);
       setSuccessMsg("Profile details updated successfully!");
       if (!isAdminViewingOther) {
-        reloadUser(); // Sync top level context
+        reloadUser();
       } else {
         fetchProfile();
       }
@@ -247,13 +240,12 @@ export default function Profile() {
             monthlyWage: $wage
           ) {
             id
-            monthly_wage
           }
         }
       `;
 
       await graphqlRequest(updateSalaryMutation, {
-        empId: employeeId,
+        empId: employeeId || myEmp.id,
         workDays: parseInt(workingDaysWeek),
         breakMins: parseInt(breakTimeMins),
         bank: bankName,
@@ -264,7 +256,7 @@ export default function Profile() {
         wage: parseFloat(monthlyWage)
       });
 
-      setSuccessMsg("Salary structure updated successfully!");
+      setSuccessMsg("Salary and corporate structure updated successfully!");
       fetchProfile();
     } catch (err) {
       setError(err.message);
@@ -302,89 +294,60 @@ export default function Profile() {
     }
   };
 
-  // Skill tag add/delete
-  const addSkill = () => {
-    if (newSkill.trim() && !skills.includes(newSkill.trim())) {
-      setSkills([...skills, newSkill.trim()]);
+  const handleAddSkill = () => {
+    if (newSkill && !skills.includes(newSkill)) {
+      setSkills([...skills, newSkill]);
       setNewSkill('');
     }
   };
 
-  const removeSkill = (indexToRemove) => {
-    setSkills(skills.filter((_, i) => i !== indexToRemove));
+  const handleRemoveSkill = (item) => {
+    setSkills(skills.filter(s => s !== item));
   };
 
-  // Certifications add/delete
-  const addCert = () => {
-    if (newCert.trim() && !certifications.includes(newCert.trim())) {
-      setCertifications([...certifications, newCert.trim()]);
+  const handleAddCert = () => {
+    if (newCert && !certifications.includes(newCert)) {
+      setCertifications([...certifications, newCert]);
       setNewCert('');
     }
   };
 
-  const removeCert = (indexToRemove) => {
-    setCertifications(certifications.filter((_, i) => i !== indexToRemove));
+  const handleRemoveCert = (item) => {
+    setCertifications(certifications.filter(c => c !== item));
   };
 
-  // Interests add/delete
-  const addInterest = () => {
-    if (newInterest.trim() && !interests.includes(newInterest.trim())) {
-      setInterests([...interests, newInterest.trim()]);
-      setNewInterest('');
-    }
-  };
-
-  const removeInterest = (indexToRemove) => {
-    setInterests(interests.filter((_, i) => i !== indexToRemove));
-  };
-
-  // Live Component calculations based on Monthly Wage input
-  const calculateLiveBreakdown = () => {
-    const wage = parseFloat(monthlyWage) || 0;
-    const basic = parseFloat((wage * 0.50).toFixed(2));
-    const hra = parseFloat((basic * 0.50).toFixed(2));
-    const standard = 4167.00;
-    const perf = parseFloat((basic * 0.0833).toFixed(2));
-    const lta = parseFloat((basic * 0.0833).toFixed(2));
-    const fixed = parseFloat((wage - (basic + hra + standard + perf + lta)).toFixed(2));
-    const pf = parseFloat((basic * 0.12).toFixed(2));
-    const pt = 200.00;
-
-    return { basic, hra, standard, perf, lta, fixed, pf, pt };
-  };
-
-  const breakdown = calculateLiveBreakdown();
-
-  if (loading) return <div className="loading-spinner">Loading Profile...</div>;
-  if (!emp) return <div className="main-content"><p>Profile not found or unauthorized.</p></div>;
+  if (loading) return <div className="loading-spinner">Loading Profile Details...</div>;
+  if (!emp) return <div className="card">Employee record unavailable.</div>;
 
   return (
     <div>
-      <div className="glass-card profile-header-card">
+      <div style={{ display: 'flex', gap: '20px', alignItems: 'center', marginBottom: '32px' }}>
         <img 
-          className="profile-avatar-large" 
           src={emp.profile_picture_url || 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y'} 
-          alt="Profile"
+          alt="Avatar" 
+          style={{ width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--accent)' }}
         />
-        <div className="profile-title-block">
-          <h1>{emp.first_name} {emp.last_name}</h1>
-          <p>{emp.designation || 'Staff Member'} — {emp.department || 'N/A'} Department</p>
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>ID: {emp.employee_code} | Joined: {emp.date_of_joining}</span>
+        <div>
+          <h1 style={{ fontSize: '2.5rem' }}>{emp.first_name} {emp.last_name}</h1>
+          <p style={{ color: 'var(--muted)', marginTop: '4px' }}>
+            {emp.designation || 'Staff'} &bull; {emp.department || 'General'}
+          </p>
         </div>
       </div>
 
+      {successMsg && <div className="alert-banner success" style={{ marginBottom: '24px' }}>{successMsg}</div>}
+      {error && <div className="alert-banner error" style={{ marginBottom: '24px' }}>{error}</div>}
+
       <div className="tabs-container">
-        <button className={`tab-btn ${activeTab === 'resume' ? 'active' : ''}`} onClick={() => setActiveTab('resume')}>
-          Resume
+        <button className={`tab-btn ${activeTab === 'view' ? 'active' : ''}`} onClick={() => setActiveTab('view')}>
+          View Profile
         </button>
-        <button className={`tab-btn ${activeTab === 'private' ? 'active' : ''}`} onClick={() => setActiveTab('private')}>
-          Private Info
+        <button className={`tab-btn ${activeTab === 'edit' ? 'active' : ''}`} onClick={() => setActiveTab('edit')}>
+          Edit Info & Resume
         </button>
-        {user?.role === 'admin' && employeeId && (
-          <button className={`tab-btn ${activeTab === 'salary' ? 'active' : ''}`} onClick={() => setActiveTab('salary')}>
-            Salary Info
-          </button>
-        )}
+        <button className={`tab-btn ${activeTab === 'salary' ? 'active' : ''}`} onClick={() => setActiveTab('salary')}>
+          Corporate & Salary
+        </button>
         {!isAdminViewingOther && (
           <button className={`tab-btn ${activeTab === 'security' ? 'active' : ''}`} onClick={() => setActiveTab('security')}>
             Security
@@ -392,319 +355,279 @@ export default function Profile() {
         )}
       </div>
 
-      {successMsg && <div className="alert-banner success">{successMsg}</div>}
-      {error && <div className="alert-banner error">{error}</div>}
-
-      {/* TABS CONTENT */}
-
-      {/* 1. Resume Tab */}
-      {activeTab === 'resume' && (
-        <div className="profile-grid-2col">
-          <div className="glass-card">
-            <h2>About Me</h2>
-            <textarea 
-              rows="6" 
-              placeholder="Tell us about yourself..." 
-              value={aboutMe} 
-              onChange={(e) => setAboutMe(e.target.value)} 
-            />
-            <button className="btn-primary" onClick={() => handleUpdateProfile('resume')} style={{ marginTop: '16px', width: '120px' }}>
-              Save
-            </button>
-          </div>
-
-          <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <div className="card">
+        {/* ========================================== */}
+        {/* 1. VIEW PROFILE (READ-ONLY VIEW)            */}
+        {/* ========================================== */}
+        {activeTab === 'view' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div>
-              <h2>Skills</h2>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                <input type="text" placeholder="Add Skill..." value={newSkill} onChange={(e) => setNewSkill(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addSkill()} />
-                <button type="button" className="btn-primary" onClick={addSkill} style={{ width: '60px' }}>+</button>
-              </div>
-              <div className="skills-list">
-                {skills.map((skill, index) => (
-                  <span key={index} className="skill-tag">
-                    {skill} <button onClick={() => removeSkill(index)}>×</button>
-                  </span>
-                ))}
-              </div>
+              <h3 style={{ fontSize: '1.4rem', marginBottom: '8px' }}>About Me</h3>
+              <p style={{ color: 'var(--ink-soft)' }}>{emp.about_me || 'No profile description available.'}</p>
             </div>
 
-            <div>
-              <h2>Certifications</h2>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                <input type="text" placeholder="Add Certification..." value={newCert} onChange={(e) => setNewCert(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCert()} />
-                <button type="button" className="btn-primary" onClick={addCert} style={{ width: '60px' }}>+</button>
+            <div className="grid-2">
+              <div>
+                <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', color: 'var(--muted)' }}>Job & System Details</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.9rem' }}>
+                  <div><strong>Employee Code:</strong> <span className="mono-font">{emp.employee_code}</span></div>
+                  <div><strong>Joining Date:</strong> <span className="mono-font">{emp.date_of_joining}</span></div>
+                  <div><strong>Role Designation:</strong> {emp.designation || 'N/A'}</div>
+                  <div><strong>Department Name:</strong> {emp.department || 'N/A'}</div>
+                </div>
               </div>
-              <div className="skills-list">
-                {certifications.map((cert, index) => (
-                  <span key={index} className="skill-tag" style={{ background: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.3)', color: '#34d399' }}>
-                    {cert} <button onClick={() => removeCert(index)}>×</button>
-                  </span>
-                ))}
+              <div>
+                <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', color: 'var(--muted)' }}>Private Contact Details</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.9rem' }}>
+                  <div><strong>Email Address:</strong> {emp.personal_email || 'N/A'}</div>
+                  <div><strong>Phone Number:</strong> {emp.phone || 'N/A'}</div>
+                  <div><strong>Residing Address:</strong> {emp.residing_address || 'N/A'}</div>
+                  <div><strong>Nationality:</strong> {emp.nationality || 'N/A'}</div>
+                </div>
               </div>
             </div>
 
-            <div>
-              <h2>Interests & Hobbies</h2>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                <input type="text" placeholder="Add Interest..." value={newInterest} onChange={(e) => setNewInterest(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addInterest()} />
-                <button type="button" className="btn-primary" onClick={addInterest} style={{ width: '60px' }}>+</button>
+            <div className="grid-2" style={{ borderTop: '1px solid var(--line)', paddingTop: '20px' }}>
+              <div>
+                <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', color: 'var(--muted)' }}>Skills</h4>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {(emp.skills || []).map((s, idx) => (
+                    <span key={idx} style={{ padding: '4px 10px', background: 'var(--accent-bg)', color: 'var(--accent)', borderRadius: '15px', fontSize: '0.8rem', fontWeight: '600' }}>{s}</span>
+                  ))}
+                  {(emp.skills || []).length === 0 && <p style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>No skills listed.</p>}
+                </div>
               </div>
-              <div className="skills-list">
-                {interests.map((interest, index) => (
-                  <span key={index} className="skill-tag" style={{ background: 'rgba(245, 158, 11, 0.15)', borderColor: 'rgba(245, 158, 11, 0.3)', color: '#fbbf24' }}>
-                    {interest} <button onClick={() => removeInterest(index)}>×</button>
-                  </span>
-                ))}
+              <div>
+                <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', color: 'var(--muted)' }}>Certifications</h4>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {(emp.certifications || []).map((c, idx) => (
+                    <span key={idx} style={{ padding: '4px 10px', background: 'var(--paper)', border: '1px solid var(--line)', color: 'var(--ink-soft)', borderRadius: '4px', fontSize: '0.8rem' }}>{c}</span>
+                  ))}
+                  {(emp.certifications || []).length === 0 && <p style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>No certifications listed.</p>}
+                </div>
               </div>
-            </div>
-
-            <button className="btn-primary" onClick={() => handleUpdateProfile('resume')}>
-              Save Resume Details
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 2. Private Info Tab */}
-      {activeTab === 'private' && (
-        <div className="profile-grid-2col">
-          <div className="glass-card">
-            <h2>Personal Information</h2>
-            <hr style={{ borderColor: 'rgba(255,255,255,0.08)', marginBottom: '16px' }} />
-            
-            <div className="info-item">
-              <label>Phone Number</label>
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            </div>
-            
-            <div className="info-item">
-              <label>Personal Email</label>
-              <input type="email" value={personalEmail} onChange={(e) => setPersonalEmail(e.target.value)} />
-            </div>
-
-            <div className="info-item">
-              <label>Date of Birth</label>
-              <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
-            </div>
-
-            <div className="info-item">
-              <label>Gender</label>
-              <select value={gender} onChange={(e) => setGender(e.target.value)}>
-                <option value="">Select...</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div className="info-item">
-              <label>Marital Status</label>
-              <select value={maritalStatus} onChange={(e) => setMaritalStatus(e.target.value)}>
-                <option value="">Select...</option>
-                <option value="Single">Single</option>
-                <option value="Married">Married</option>
-              </select>
-            </div>
-
-            <div className="info-item">
-              <label>Nationality</label>
-              <input type="text" value={nationality} onChange={(e) => setNationality(e.target.value)} />
-            </div>
-
-            <div className="info-item">
-              <label>Residing Address</label>
-              <textarea rows="3" value={residingAddress} onChange={(e) => setResidingAddress(e.target.value)} />
-            </div>
-
-            <button className="btn-primary" onClick={() => handleUpdateProfile('private')} style={{ width: '150px' }}>
-              Save Profile
-            </button>
-          </div>
-
-          <div className="glass-card">
-            <h2>Job & Corporate Details</h2>
-            <hr style={{ borderColor: 'rgba(255,255,255,0.08)', marginBottom: '16px' }} />
-            
-            <div className="info-item">
-              <label>Employee Code</label>
-              <span>{emp.employee_code}</span>
-            </div>
-
-            <div className="info-item">
-              <label>Designation / Job Position</label>
-              <span>{emp.designation || 'Staff'}</span>
-            </div>
-
-            <div className="info-item">
-              <label>Department</label>
-              <span>{emp.department || 'Corporate'}</span>
-            </div>
-
-            <div className="info-item">
-              <label>Date of Joining</label>
-              <span>{emp.date_of_joining}</span>
-            </div>
-
-            <div className="info-item">
-              <label>Employment Status</label>
-              <span className={`status-badge approved`}>{emp.employment_status}</span>
-            </div>
-
-            <div className="info-item">
-              <label>Reporting Manager ID</label>
-              <span>{emp.reporting_manager_id || 'Direct to HR'}</span>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* 3. Salary Info Tab (Admin-Only) */}
-      {activeTab === 'salary' && user?.role === 'admin' && (
-        <div className="profile-grid-2col">
-          <form className="glass-card" onSubmit={handleUpdateSalary}>
-            <h2>Configure Salary Settings</h2>
-            <hr style={{ borderColor: 'rgba(255,255,255,0.08)', marginBottom: '16px' }} />
+        {/* ========================================== */}
+        {/* 2. EDIT PROFILE & RESUME VIEW              */}
+        {/* ========================================== */}
+        {activeTab === 'edit' && (
+          <form onSubmit={handleUpdateProfileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <h3 style={{ fontSize: '1.4rem' }}>Edit Personal Resume & Details</h3>
 
-            <div className="info-item">
-              <label>Monthly Gross Wage (CTC - ₹)</label>
-              <input type="number" value={monthlyWage} onChange={(e) => setMonthlyWage(e.target.value)} required />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>About Me (Bio)</label>
+              <textarea rows="3" value={aboutMe} onChange={(e) => setAboutMe(e.target.value)} placeholder="Introduce yourself..." />
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div className="info-item">
-                <label>Work Days / Week</label>
-                <input type="number" min="4" max="7" value={workingDaysWeek} onChange={(e) => setWorkingDaysWeek(e.target.value)} required />
+            <div className="grid-2">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Personal Email</label>
+                <input type="email" value={personalEmail} onChange={(e) => setPersonalEmail(e.target.value)} />
               </div>
-              <div className="info-item">
-                <label>Daily Break Time (mins)</label>
-                <input type="number" value={breakTimeMins} onChange={(e) => setBreakTimeMins(e.target.value)} required />
-              </div>
-            </div>
-
-            <h3 style={{ margin: '16px 0 8px 0', fontSize: '1rem', color: 'var(--text-secondary)' }}>Bank Account Details</h3>
-            <div className="info-item">
-              <label>Bank Name</label>
-              <input type="text" value={bankName} onChange={(e) => setBankName(e.target.value)} />
-            </div>
-            <div className="info-item">
-              <label>Account Number</label>
-              <input type="text" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
-            </div>
-            <div className="info-item">
-              <label>IFSC Code</label>
-              <input type="text" value={ifscCode} onChange={(e) => setIfscCode(e.target.value)} />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              <div className="info-item">
-                <label>PAN No</label>
-                <input type="text" value={panNo} onChange={(e) => setPanNo(e.target.value)} />
-              </div>
-              <div className="info-item">
-                <label>UAN No</label>
-                <input type="text" value={uanNo} onChange={(e) => setUanNo(e.target.value)} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Phone Number</label>
+                <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} />
               </div>
             </div>
 
-            <button type="submit" className="btn-primary">
-              Update Salary Structure
+            <div className="grid-2">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Date of Birth</label>
+                <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Gender</label>
+                <select value={gender} onChange={(e) => setGender(e.target.value)}>
+                  <option value="">Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid-2">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Marital Status</label>
+                <select value={maritalStatus} onChange={(e) => setMaritalStatus(e.target.value)}>
+                  <option value="">Select Marital Status</option>
+                  <option value="Single">Single</option>
+                  <option value="Married">Married</option>
+                  <option value="Divorced">Divorced</option>
+                </select>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Nationality</label>
+                <input type="text" value={nationality} onChange={(e) => setNationality(e.target.value)} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Residing Address</label>
+              <textarea rows="2" value={residingAddress} onChange={(e) => setResidingAddress(e.target.value)} />
+            </div>
+
+            {/* Skills & Certifications Tag Editors */}
+            <div style={{ borderTop: '1px solid var(--line)', paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Skills (Tags)</label>
+                <div style={{ display: 'flex', gap: '10px', margin: '8px 0' }}>
+                  <input type="text" value={newSkill} onChange={(e) => setNewSkill(e.target.value)} placeholder="e.g. Node.js" style={{ width: '200px' }} />
+                  <button type="button" className="btn-secondary" onClick={handleAddSkill}>Add</button>
+                </div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {skills.map((s, i) => (
+                    <span key={i} style={{ padding: '4px 10px', background: 'var(--accent-bg)', color: 'var(--accent)', borderRadius: '15px', fontSize: '0.8rem', cursor: 'pointer' }} onClick={() => handleRemoveSkill(s)}>
+                      {s} &times;
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Certifications</label>
+                <div style={{ display: 'flex', gap: '10px', margin: '8px 0' }}>
+                  <input type="text" value={newCert} onChange={(e) => setNewCert(e.target.value)} placeholder="e.g. AWS Certified" style={{ width: '200px' }} />
+                  <button type="button" className="btn-secondary" onClick={handleAddCert}>Add</button>
+                </div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {certifications.map((c, i) => (
+                    <span key={i} style={{ padding: '4px 10px', background: 'var(--paper)', border: '1px solid var(--line)', color: 'var(--ink-soft)', borderRadius: '4px', fontSize: '0.8rem', cursor: 'pointer' }} onClick={() => handleRemoveCert(c)}>
+                      {c} &times;
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-start', marginTop: '10px' }}>
+              Save Details
             </button>
           </form>
+        )}
 
-          <div className="glass-card">
-            <h2>Auto-Calculated Components</h2>
-            <p className="subtitle">Breakdown computed from Monthly Wage of ₹{monthlyWage}</p>
-            <hr style={{ borderColor: 'rgba(255,255,255,0.08)', marginBottom: '16px' }} />
+        {/* ========================================== */}
+        {/* 3. CORPORATE & SALARY INFO VIEW            */}
+        {/* ========================================== */}
+        {activeTab === 'salary' && (
+          <div>
+            {activeRole === 'admin' ? (
+              /* Editable Form for Admin */
+              <form onSubmit={handleUpdateSalary} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <h3 style={{ fontSize: '1.4rem' }}>Update Corporate & Wage Settings (Admin Only)</h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Basic Salary (50% of Wage):</span>
-                <strong>₹ {breakdown.basic.toLocaleString()}</strong>
+                <div className="grid-2">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Monthly Gross Wage (₹)</label>
+                    <input type="number" value={monthlyWage} onChange={(e) => setMonthlyWage(e.target.value)} required />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Working Days per Week</label>
+                    <input type="number" value={workingDaysWeek} onChange={(e) => setWorkingDaysWeek(e.target.value)} required />
+                  </div>
+                </div>
+
+                <div className="grid-2">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Daily Break Duration (Minutes)</label>
+                    <input type="number" value={breakTimeMins} onChange={(e) => setBreakTimeMins(e.target.value)} required />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Bank Name</label>
+                    <input type="text" value={bankName} onChange={(e) => setBankName(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="grid-3">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Account Number</label>
+                    <input type="text" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Bank IFSC Code</label>
+                    <input type="text" value={ifscCode} onChange={(e) => setIfscCode(e.target.value)} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>PAN Card Number</label>
+                    <input type="text" value={panNo} onChange={(e) => setPanNo(e.target.value)} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '200px' }}>
+                  <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>EPF UAN Number</label>
+                  <input type="text" value={uanNo} onChange={(e) => setUanNo(e.target.value)} />
+                </div>
+
+                <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-start', marginTop: '10px' }}>
+                  Update Structure
+                </button>
+              </form>
+            ) : (
+              /* Read-only view for Employee */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <h3 style={{ fontSize: '1.4rem' }}>Bank & Corporate Registry</h3>
+                <p style={{ color: 'var(--muted)' }}>These corporate parameters are read-only and can only be modified by the HR Admin.</p>
+
+                <div className="grid-2">
+                  <div>
+                    <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', color: 'var(--muted)' }}>Shift Structure</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.9rem' }}>
+                      <div><strong>Working Days / Week:</strong> <span className="mono-font">{workingDaysWeek} Days</span></div>
+                      <div><strong>Shift Break Time:</strong> <span className="mono-font">{breakTimeMins} minutes</span></div>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: '1.1rem', marginBottom: '8px', color: 'var(--muted)' }}>Payment Disbursal Account</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.9rem' }}>
+                      <div><strong>Bank Name:</strong> {bankName || 'N/A'}</div>
+                      <div><strong>Account Number:</strong> <span className="mono-font">{accountNumber || 'N/A'}</span></div>
+                      <div><strong>IFSC Code:</strong> <span className="mono-font">{ifscCode || 'N/A'}</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid var(--line)', paddingTop: '20px', fontSize: '0.9rem' }}>
+                  <div className="grid-2">
+                    <div><strong>PAN Number:</strong> <span className="mono-font">{panNo || 'N/A'}</span></div>
+                    <div><strong>PF UAN Number:</strong> <span className="mono-font">{uanNo || 'N/A'}</span></div>
+                  </div>
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>House Rent Allowance (50% of Basic):</span>
-                <strong>₹ {breakdown.hra.toLocaleString()}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Standard Allowance (Fixed):</span>
-                <strong>₹ {breakdown.standard.toLocaleString()}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Performance Bonus (8.33% of Basic):</span>
-                <strong>₹ {breakdown.perf.toLocaleString()}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Leave Travel Allowance (8.33% of Basic):</span>
-                <strong>₹ {breakdown.lta.toLocaleString()}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: breakdown.fixed < 0 ? 'var(--danger)' : 'var(--success)' }}>
-                <span>Fixed Allowance (Remaining):</span>
-                <strong>₹ {breakdown.fixed.toLocaleString()}</strong>
-              </div>
-              
-              <hr style={{ borderColor: 'rgba(255,255,255,0.08)', margin: '8px 0' }} />
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#fca5a5' }}>
-                <span>Employee PF Deduction (12% of Basic):</span>
-                <strong>- ₹ {breakdown.pf.toLocaleString()}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#fca5a5' }}>
-                <span>Professional Tax (Fixed):</span>
-                <strong>- ₹ {breakdown.pt.toLocaleString()}</strong>
-              </div>
-              
-              <hr style={{ borderColor: 'rgba(255,255,255,0.08)', margin: '8px 0' }} />
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: '700' }}>
-                <span>Estimated Net Pay / Month:</span>
-                <span style={{ color: 'var(--success)' }}>₹ {(monthlyWage - breakdown.pf - breakdown.pt).toLocaleString()}</span>
-              </div>
-            </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* 4. Security Tab */}
-      {activeTab === 'security' && !isAdminViewingOther && (
-        <div className="glass-card" style={{ maxWidth: '500px', margin: '0 auto' }}>
-          <h2>Change Account Password</h2>
-          <hr style={{ borderColor: 'rgba(255,255,255,0.08)', marginBottom: '24px' }} />
+        {/* ========================================== */}
+        {/* 4. SECURITY (PASSWORD UPDATES)             */}
+        {/* ========================================== */}
+        {activeTab === 'security' && !isAdminViewingOther && (
+          <form onSubmit={handleChangePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '400px' }}>
+            <h3 style={{ fontSize: '1.4rem' }}>Update Security Settings</h3>
 
-          <form onSubmit={handleChangePasswordSubmit}>
-            <div className="form-group">
-              <label>Current Password</label>
-              <input 
-                type="password" 
-                value={currentPassword} 
-                onChange={(e) => setCurrentPassword(e.target.value)} 
-                required 
-              />
-            </div>
-            <div className="form-group">
-              <label>New Password</label>
-              <input 
-                type="password" 
-                value={newPassword} 
-                onChange={(e) => setNewPassword(e.target.value)} 
-                required 
-              />
-            </div>
-            <div className="form-group">
-              <label>Confirm New Password</label>
-              <input 
-                type="password" 
-                value={confirmPassword} 
-                onChange={(e) => setConfirmPassword(e.target.value)} 
-                required 
-              />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Current Password</label>
+              <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
             </div>
 
-            <button type="submit" className="btn-primary">
-              Update Password
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>New Password</label>
+              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Confirm New Password</label>
+              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
+            </div>
+
+            <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-start', marginTop: '10px' }}>
+              Change Password
             </button>
           </form>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

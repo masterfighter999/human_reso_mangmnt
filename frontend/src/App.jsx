@@ -25,16 +25,16 @@ export async function graphqlRequest(query, variables = {}) {
 
 // Sidebar Navigation Component
 function Sidebar() {
-  const { logout, user } = useContext(AuthContext);
+  const { logout, user, activeRole, viewMode, setViewMode } = useContext(AuthContext);
   const location = useLocation();
 
   const isActive = (path) => location.pathname === path ? 'active' : '';
 
   return (
-    <div className="sidebar glass-panel">
+    <div className="sidebar">
       <div className="sidebar-logo">
-        <h2>Odoo India</h2>
-        <span>HRMS Portal</span>
+        <h2>Align HRMS</h2>
+        <span>perfectly aligned</span>
       </div>
 
       <nav className="sidebar-nav">
@@ -53,9 +53,32 @@ function Sidebar() {
         <Link to="/payroll" className={`nav-item ${isActive('/payroll')}`}>
           <span className="icon">💰</span> Payroll
         </Link>
+
+        {activeRole === 'admin' && (
+          <>
+            <Link to="/employees" className={`nav-item ${isActive('/employees')}`}>
+              <span className="icon">👥</span> Employees
+            </Link>
+            <Link to="/approvals" className={`nav-item ${isActive('/approvals')}`}>
+              <span className="icon">✓</span> Approvals Queue
+            </Link>
+          </>
+        )}
       </nav>
 
       <div className="sidebar-footer">
+        {user?.role === 'admin' && (
+          <div className="role-switcher-section">
+            <span style={{ color: '#a5b4fc', fontSize: '0.75rem', fontWeight: '600' }}>View As:</span>
+            <select 
+              value={viewMode} 
+              onChange={(e) => setViewMode(e.target.value)}
+            >
+              <option value="admin">HR Admin</option>
+              <option value="employee">Employee</option>
+            </select>
+          </div>
+        )}
         <button onClick={logout} className="logout-btn">
           <span className="icon">🚪</span> Log Out
         </button>
@@ -79,30 +102,34 @@ function Header() {
   };
 
   const getStatusColor = () => {
-    if (activeCheckIn) return 'present'; // Green
-    return 'absent'; // Yellow
+    if (activeCheckIn) return 'present';
+    return 'absent';
   };
 
   const getStatusText = () => {
     if (activeCheckIn) {
       const checkInTime = new Date(activeCheckIn.check_in);
-      return `Checked In since ${checkInTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      return `Checked In at ${checkInTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     }
     return 'Checked Out';
   };
 
   return (
-    <header className="app-header glass-panel">
+    <header className="app-header">
       <div className="header-left">
-        <span className="date-display">{currentTime.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-        <span className="time-display">{formatTime(currentTime)}</span>
+        <span className="display-font" style={{ fontSize: '1.2rem', marginRight: '8px' }}>
+          {currentTime.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+        </span>
+        <span className="mono-font" style={{ fontSize: '0.9rem', color: 'var(--muted)', background: 'var(--panel)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--line)' }}>
+          {formatTime(currentTime)}
+        </span>
       </div>
 
       <div className="header-right">
         <div className="systray-widget">
           <div className="status-indicator">
             <span className={`status-dot ${getStatusColor()}`}></span>
-            <span className="status-text">{getStatusText()}</span>
+            <span className="status-text" style={{ fontSize: '0.85rem' }}>{getStatusText()}</span>
           </div>
           <button 
             className={`check-btn ${activeCheckIn ? 'checkout' : 'checkin'}`} 
@@ -159,6 +186,8 @@ import Profile from './pages/Profile';
 import Attendance from './pages/Attendance';
 import TimeOff from './pages/TimeOff';
 import Payroll from './pages/Payroll';
+import Employees from './pages/Employees';
+import Approvals from './pages/Approvals';
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
@@ -166,6 +195,7 @@ export default function App() {
   const [employee, setEmployee] = useState(null);
   const [activeCheckIn, setActiveCheckIn] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('admin');
 
   // Authenticate user on load
   const loadUser = async () => {
@@ -174,7 +204,6 @@ export default function App() {
       return;
     }
     try {
-      // Get me query
       const meQuery = `
         query {
           me {
@@ -214,6 +243,9 @@ export default function App() {
       setUser(data.me);
       setEmployee(data.myProfile);
       setActiveCheckIn(data.activeCheckIn);
+      if (data.me && data.me.role) {
+        setViewMode(data.me.role);
+      }
     } catch (err) {
       console.error("Failed to load user:", err);
       logout();
@@ -231,6 +263,9 @@ export default function App() {
     setToken(jwtToken);
     setUser(userData);
     setEmployee(employeeData);
+    if (userData && userData.role) {
+      setViewMode(userData.role);
+    }
   };
 
   const logout = () => {
@@ -244,7 +279,6 @@ export default function App() {
   const handleCheckInOut = async () => {
     try {
       if (activeCheckIn) {
-        // Run checkOut mutation
         const checkOutMutation = `
           mutation {
             checkOut(remarks: "Checked out via header button") {
@@ -259,7 +293,6 @@ export default function App() {
         setActiveCheckIn(null);
         alert('Successfully Checked Out!');
       } else {
-        // Run checkIn mutation
         const checkInMutation = `
           mutation {
             checkIn(remarks: "Checked in via header button") {
@@ -272,15 +305,16 @@ export default function App() {
         setActiveCheckIn(data.checkIn);
         alert('Successfully Checked In!');
       }
-      // Reload profile/active logs
       loadUser();
     } catch (err) {
       alert(err.message);
     }
   };
 
+  const activeRole = user?.role === 'admin' ? viewMode : 'employee';
+
   return (
-    <AuthContext.Provider value={{ token, user, employee, activeCheckIn, loading, login, logout, handleCheckInOut, reloadUser: loadUser }}>
+    <AuthContext.Provider value={{ token, user, employee, activeCheckIn, loading, login, logout, handleCheckInOut, reloadUser: loadUser, activeRole, viewMode, setViewMode }}>
       <Router>
         <Routes>
           <Route path="/login" element={token ? <Navigate to="/" replace /> : <Login />} />
@@ -313,6 +347,19 @@ export default function App() {
           <Route path="/payroll" element={
             <ProtectedRoute>
               <Layout><Payroll /></Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* Admin Protected Routes */}
+          <Route path="/employees" element={
+            <ProtectedRoute>
+              {activeRole === 'admin' ? <Layout><Employees /></Layout> : <Navigate to="/" replace />}
+            </ProtectedRoute>
+          } />
+
+          <Route path="/approvals" element={
+            <ProtectedRoute>
+              {activeRole === 'admin' ? <Layout><Approvals /></Layout> : <Navigate to="/" replace />}
             </ProtectedRoute>
           } />
 
