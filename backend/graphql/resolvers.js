@@ -52,7 +52,22 @@ const resolvers = {
       throw new Error('Unauthorized');
     }
     const res = await db.query('SELECT * FROM employees ORDER BY created_at DESC');
-    return res.rows;
+    const employees = res.rows;
+
+    // Fetch active salary structures for all employees (admin context)
+    const ssRes = await db.query(`
+      SELECT * FROM salary_structures
+      WHERE effective_to IS NULL
+    `);
+    const salaryMap = {};
+    for (const ss of ssRes.rows) {
+      salaryMap[ss.employee_id] = ss;
+    }
+
+    return employees.map((emp) => ({
+      ...emp,
+      salary_structure: salaryMap[emp.id] || null,
+    }));
   },
 
   employee: async ({ id }, context) => {
@@ -65,8 +80,19 @@ const resolvers = {
     if (context.user.role !== 'admin' && context.user.id !== emp.user_id) {
       throw new Error('Unauthorized');
     }
+
+    // Attach salary_structure for admin
+    if (context.user.role === 'admin') {
+      const ssRes = await db.query(
+        'SELECT * FROM salary_structures WHERE employee_id = $1 AND effective_to IS NULL',
+        [emp.id]
+      );
+      return { ...emp, salary_structure: ssRes.rows[0] || null };
+    }
+
     return emp;
   },
+
 
   attendanceLogs: async ({ employeeId, month }, context) => {
     if (!context.user) throw new Error('Authentication required');
