@@ -33,6 +33,48 @@ function calculateComponents(monthlyWage) {
   };
 }
 
+const enrichEmployee = (row) => {
+  if (!row) return null;
+  return {
+    ...row,
+    salary_structure: async (args, context) => {
+      const res = await db.query('SELECT * FROM salary_structures WHERE employee_id = $1 AND effective_to IS NULL', [row.id]);
+      return res.rows[0] || null;
+    },
+    work_status: async () => {
+      const attRes = await db.query(
+        'SELECT status FROM attendance WHERE employee_id = $1 AND att_date = CURRENT_DATE',
+        [row.id]
+      );
+      if (attRes.rowCount > 0) {
+        const status = attRes.rows[0].status;
+        if (status === 'present' || status === 'half_day') return 'present';
+        if (status === 'leave') return 'leave';
+      }
+      return 'absent';
+    },
+    monthly_wage: async () => {
+      const res = await db.query('SELECT monthly_wage FROM salary_structures WHERE employee_id = $1 AND effective_to IS NULL', [row.id]);
+      return res.rows[0]?.monthly_wage ? parseFloat(res.rows[0].monthly_wage) : 0.0;
+    }
+  };
+};
+
+const enrichLeaveRequest = (row) => {
+  if (!row) return null;
+  return {
+    ...row,
+    leave_type: async () => {
+      const res = await db.query('SELECT * FROM leave_types WHERE id = $1', [row.leave_type_id]);
+      return res.rows[0] || null;
+    },
+    employee: async () => {
+      const res = await db.query('SELECT * FROM employees WHERE id = $1', [row.employee_id]);
+      return enrichEmployee(res.rows[0]) || null;
+    }
+  };
+};
+
 const resolvers = {
   // Queries
   me: async (args, context) => {
@@ -44,7 +86,7 @@ const resolvers = {
   myProfile: async (args, context) => {
     if (!context.user) throw new Error('Authentication required');
     const res = await db.query('SELECT * FROM employees WHERE user_id = $1', [context.user.id]);
-    return res.rows[0];
+    return enrichEmployee(res.rows[0]);
   },
 
   employees: async (args, context) => {
@@ -64,7 +106,7 @@ const resolvers = {
       salaryMap[ss.employee_id] = ss;
     }
 
-    return employees.map((emp) => ({
+    return employees.map((emp) => enrichEmployee({
       ...emp,
       salary_structure: salaryMap[emp.id] || null,
     }));
@@ -87,10 +129,10 @@ const resolvers = {
         'SELECT * FROM salary_structures WHERE employee_id = $1 AND effective_to IS NULL',
         [emp.id]
       );
-      return { ...emp, salary_structure: ssRes.rows[0] || null };
+      return enrichEmployee({ ...emp, salary_structure: ssRes.rows[0] || null });
     }
 
-    return emp;
+    return enrichEmployee(emp);
   },
 
 
@@ -176,7 +218,7 @@ const resolvers = {
     queryStr += ' ORDER BY r.created_at DESC';
 
     const res = await db.query(queryStr, params);
-    return res.rows;
+    return res.rows.map(row => enrichLeaveRequest(row));
   },
 
   leaveTypes: async () => {
@@ -312,7 +354,7 @@ const resolvers = {
       await client.query('COMMIT');
 
       const token = signToken(user);
-      return { token, user, employee };
+      return { token, user, employee: enrichEmployee(employee) };
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;
@@ -340,7 +382,7 @@ const resolvers = {
     await db.query('UPDATE users SET last_login_at = now() WHERE id = $1', [user.id]);
 
     const token = signToken(user);
-    return { token, user, employee };
+    return { token, user, employee: enrichEmployee(employee) };
   },
 
   createEmployee: async ({ firstName, lastName, email, phone, department, designation, dateOfJoining, monthlyWage }, context) => {
@@ -407,8 +449,7 @@ const resolvers = {
       // Since about_me is type TEXT, we can temporarily return it in about_me or design a metadata field.
       // Let's store temporary text in about_me for display, so the admin sees the temp password on success!
       employee.about_me = `Credentials -> Login ID: ${loginId} | Temporary Password: ${tempPassword}`;
-      
-      return employee;
+      return enrichEmployee(employee);
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;
@@ -455,13 +496,13 @@ const resolvers = {
 
     if (fields.length === 0) {
       const res = await db.query('SELECT * FROM employees WHERE id = $1', [employeeId]);
-      return res.rows[0];
+      return enrichEmployee(res.rows[0]);
     }
 
     params.push(employeeId);
     const queryStr = `UPDATE employees SET ${fields.join(', ')}, updated_at = now() WHERE id = $${index} RETURNING *`;
     const updateRes = await db.query(queryStr, params);
-    return updateRes.rows[0];
+    return enrichEmployee(updateRes.rows[0]);
   },
 
   updateSalaryStructure: async ({ employeeId, workingDaysWeek, breakTimeMins, bankName, accountNumber, ifscCode, panNo, uanNo, monthlyWage }, context) => {
@@ -622,7 +663,7 @@ const resolvers = {
       RETURNING *
     `, [employeeId, leaveTypeId, startDate, endDate, durationDays, remarks, attachmentUrl]);
 
-    return insertRes.rows[0];
+    return enrichLeaveRequest(insertRes.rows[0]);
   },
 
   reviewLeave: async ({ leaveRequestId, status, reviewComments }, context) => {
@@ -671,7 +712,7 @@ const resolvers = {
       }
 
       await client.query('COMMIT');
-      return request;
+      return enrichLeaveRequest(request);
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;
@@ -860,6 +901,7 @@ const LeaveRequestResolvers = {
     return res.rows[0] || null;
   },
   employee: async (parent) => {
+    console.log("LeaveRequest employee resolver parent:", parent);
     const res = await db.query('SELECT * FROM employees WHERE id = $1', [parent.employee_id]);
     return res.rows[0] || null;
   }

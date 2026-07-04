@@ -70,6 +70,7 @@ const schema = buildSchema(`
     updated_at: String!
     work_status: String
     salary_structure: SalaryStructure # Admin only
+    monthly_wage: Float
   }
 
   type Attendance {
