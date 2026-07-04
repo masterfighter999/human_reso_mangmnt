@@ -76,27 +76,34 @@ const resolvers = {
       const empRes = await db.query('SELECT id FROM employees WHERE user_id = $1', [context.user.id]);
       if (empRes.rowCount === 0) throw new Error('Employee profile not found');
       empId = empRes.rows[0].id;
-    } else if (!empId) {
-      // Admin: if no employeeId is provided, get today's attendance for all
-      const dateStr = new Date().toISOString().split('T')[0];
-      const res = await db.query(`
-        SELECT a.*, concat(e.first_name, ' ', e.last_name) as employee_name 
-        FROM attendance a
-        JOIN employees e ON a.employee_id = e.id
-        WHERE a.att_date = $1
-      `, [dateStr]);
-      return res.rows;
     }
 
-    let queryStr = 'SELECT a.*, concat(e.first_name, \' \', e.last_name) as employee_name FROM attendance a JOIN employees e ON a.employee_id = e.id WHERE a.employee_id = $1';
-    const params = [empId];
+    let queryStr = `
+      SELECT a.*, concat(e.first_name, ' ', e.last_name) as employee_name 
+      FROM attendance a
+      JOIN employees e ON a.employee_id = e.id
+      WHERE 1=1
+    `;
+    const params = [];
+    let paramIndex = 1;
+
+    if (empId) {
+      queryStr += ` AND a.employee_id = $${paramIndex++}`;
+      params.push(empId);
+    }
 
     if (month) {
       // Month format: YYYY-MM
-      queryStr += ' AND to_char(a.att_date, \'YYYY-MM\') = $2';
+      queryStr += ` AND to_char(a.att_date, 'YYYY-MM') = $${paramIndex++}`;
       params.push(month);
+    } else if (!empId) {
+      // Admin: if no employeeId and no month is provided, default to today's attendance for all
+      const dateStr = new Date().toISOString().split('T')[0];
+      queryStr += ` AND a.att_date = $${paramIndex++}`;
+      params.push(dateStr);
     }
-    queryStr += ' ORDER BY a.att_date DESC';
+
+    queryStr += ' ORDER BY a.att_date DESC, employee_name ASC';
     const res = await db.query(queryStr, params);
     return res.rows;
   },

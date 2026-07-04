@@ -265,7 +265,14 @@ export default function Attendance() {
               /* MONTHLY ALIGNMENT GRID VIEW */
               <div style={{ padding: '12px 0' }}>
                 <h3 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>Monthly Status Heatmap</h3>
-                <AlignmentGrid statusList={gridStatuses} size={gridStatuses.length} />
+                {activeRole === 'admin' && !filterEmployeeId ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', border: '1px dashed var(--line)', borderRadius: '8px', color: 'var(--muted)' }}>
+                    <span style={{ fontSize: '2rem', display: 'block', marginBottom: '12px' }}>📊</span>
+                    <p>Select an employee from the dropdown to view their individual monthly attendance heatmap.</p>
+                  </div>
+                ) : (
+                  <AlignmentGrid statusList={gridStatuses} size={gridStatuses.length} />
+                )}
               </div>
             ) : (
               /* DETAILED LOG TABLE VIEW */
