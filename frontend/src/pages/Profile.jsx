@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext, graphqlRequest } from '../App';
+import PasswordField, { analyzePassword } from '../components/PasswordField';
 
 export default function Profile() {
   const { user, employee: myEmp, reloadUser, activeRole } = useContext(AuthContext);
@@ -285,8 +286,14 @@ export default function Profile() {
     setError(null);
     setSuccessMsg(null);
 
+    const pwStrength = analyzePassword(newPassword);
+    if (pwStrength.score < 3) {
+      setError('New password is too weak. Please choose a stronger password (at least Strong).');
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
-      setError("New passwords do not match");
+      setError('New passwords do not match.');
       return;
     }
 
@@ -302,7 +309,7 @@ export default function Profile() {
         new: newPassword
       });
 
-      setSuccessMsg("Password changed successfully!");
+      setSuccessMsg('Password changed successfully!');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -620,30 +627,92 @@ export default function Profile() {
         {/* ========================================== */}
         {/* 4. SECURITY (PASSWORD UPDATES)             */}
         {/* ========================================== */}
-        {activeTab === 'security' && !isAdminViewingOther && (
-          <form onSubmit={handleChangePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '400px' }}>
-            <h3 style={{ fontSize: '1.4rem' }}>Update Security Settings</h3>
+        {activeTab === 'security' && !isAdminViewingOther && (() => {
+          const newPwStrength = analyzePassword(newPassword);
+          const submitDisabled = newPassword.length > 0 && newPwStrength.score < 3;
+          return (
+            <form onSubmit={handleChangePasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '440px' }}>
+              <h3 style={{ fontSize: '1.4rem' }}>Update Security Settings</h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Current Password</label>
-              <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
-            </div>
+              {/* Current Password — plain, no strength meter */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--muted)', fontWeight: 600 }}>Current Password</label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                    style={{ width: '100%' }}
+                  />
+                </div>
+              </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>New Password</label>
-              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
-            </div>
+              {/* New Password — with strength meter */}
+              <PasswordField
+                id="profile-new-password"
+                label="New Password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                showStrength={true}
+              />
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Confirm New Password</label>
-              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
-            </div>
+              {/* Confirm New Password */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '0.85rem', color: 'var(--muted)', fontWeight: 600 }}>Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                  style={{
+                    width: '100%',
+                    borderColor: confirmPassword.length > 0
+                      ? confirmPassword === newPassword ? 'var(--accent)' : 'var(--rose)'
+                      : undefined,
+                    transition: 'border-color 0.25s',
+                  }}
+                />
+                {confirmPassword.length > 0 && (
+                  <div style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    color: confirmPassword === newPassword ? 'var(--accent)' : 'var(--rose)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}>
+                    {confirmPassword === newPassword ? '✓ Passwords match' : '✗ Passwords do not match'}
+                  </div>
+                )}
+              </div>
 
-            <button type="submit" className="btn-primary" style={{ alignSelf: 'flex-start', marginTop: '10px' }}>
-              Change Password
-            </button>
-          </form>
-        )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={submitDisabled}
+                  style={{
+                    alignSelf: 'flex-start',
+                    marginTop: '4px',
+                    opacity: submitDisabled ? 0.6 : 1,
+                    cursor: submitDisabled ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Change Password
+                </button>
+                {submitDisabled && (
+                  <p style={{ fontSize: '0.78rem', color: 'var(--rose)' }}>
+                    🔒 Strengthen your new password to proceed
+                  </p>
+                )}
+              </div>
+            </form>
+          );
+        })()}
       </div>
     </div>
   );

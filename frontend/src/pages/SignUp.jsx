@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext, graphqlRequest } from '../App';
+import PasswordField, { analyzePassword } from '../components/PasswordField';
 
 export default function SignUp() {
   const { login } = useContext(AuthContext);
@@ -15,12 +16,20 @@ export default function SignUp() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const passwordStrength = analyzePassword(password);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
 
+    // Block low-strength passwords
+    if (passwordStrength.score < 3) {
+      setError('Your password is too weak. Please make it stronger before continuing.');
+      return;
+    }
+
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError('Passwords do not match.');
       return;
     }
 
@@ -73,6 +82,8 @@ export default function SignUp() {
     return 'upcoming';
   });
 
+  const submitDisabled = loading || (password.length > 0 && passwordStrength.score < 3);
+
   return (
     <div className="auth-wrapper">
       {/* Dark Visual Panel */}
@@ -112,9 +123,9 @@ export default function SignUp() {
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--ink-soft)' }}>Company Name</label>
-              <input 
-                type="text" 
-                placeholder="e.g. Odoo India" 
+              <input
+                type="text"
+                placeholder="e.g. Odoo India"
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 required
@@ -123,9 +134,9 @@ export default function SignUp() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--ink-soft)' }}>Full Name</label>
-              <input 
-                type="text" 
-                placeholder="e.g. John Doe" 
+              <input
+                type="text"
+                placeholder="e.g. John Doe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -134,9 +145,9 @@ export default function SignUp() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--ink-soft)' }}>Email Address</label>
-              <input 
-                type="email" 
-                placeholder="admin@company.com" 
+              <input
+                type="email"
+                placeholder="admin@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -145,46 +156,82 @@ export default function SignUp() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--ink-soft)' }}>Phone Number</label>
-              <input 
-                type="tel" 
-                placeholder="e.g. +91 98765 43210" 
+              <input
+                type="tel"
+                placeholder="e.g. +91 98765 43210"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
               />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--ink-soft)' }}>Password</label>
-              <input 
-                type="password" 
-                placeholder="••••••••" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
+            {/* Password with strength meter */}
+            <PasswordField
+              id="signup-password"
+              label="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              showStrength={true}
+            />
 
+            {/* Confirm Password */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--ink-soft)' }}>Confirm Password</label>
-              <input 
-                type="password" 
-                placeholder="••••••••" 
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="password"
+                  id="signup-confirm-password"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    borderColor: confirmPassword.length > 0
+                      ? confirmPassword === password ? 'var(--accent)' : 'var(--rose)'
+                      : undefined,
+                    transition: 'border-color 0.25s',
+                  }}
+                />
+              </div>
+              {/* Match indicator */}
+              {confirmPassword.length > 0 && (
+                <div style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: confirmPassword === password ? 'var(--accent)' : 'var(--rose)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}>
+                  {confirmPassword === password ? '✓ Passwords match' : '✗ Passwords do not match'}
+                </div>
+              )}
             </div>
 
-            <button type="submit" className="btn-primary" disabled={loading} style={{ marginTop: '12px' }}>
-              {loading ? "Registering..." : "Complete Setup"}
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={submitDisabled}
+              style={{ marginTop: '12px', opacity: submitDisabled ? 0.6 : 1, cursor: submitDisabled ? 'not-allowed' : 'pointer' }}
+            >
+              {loading ? 'Registering...' : 'Complete Setup'}
             </button>
+
+            {/* Strength gate notice */}
+            {password.length > 0 && passwordStrength.score < 3 && (
+              <p style={{ fontSize: '0.78rem', color: 'var(--rose)', textAlign: 'center', marginTop: '-8px' }}>
+                🔒 Strengthen your password to enable registration
+              </p>
+            )}
           </form>
 
           <div style={{ marginTop: '24px', fontSize: '0.9rem', color: 'var(--muted)', textAlign: 'center' }}>
             Already have an Account?{' '}
-            <span 
-              onClick={() => navigate('/login')} 
+            <span
+              onClick={() => navigate('/login')}
               style={{ color: 'var(--accent)', fontWeight: '600', cursor: 'pointer', textDecoration: 'underline' }}
             >
               Sign In
