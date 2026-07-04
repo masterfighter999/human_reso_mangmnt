@@ -1,7 +1,6 @@
 import { z } from 'zod';
 
 // ─── Password Rules ───────────────────────────────────────────────────────────
-// Centralised so frontend and backend share identical requirements.
 
 const passwordSchema = z
   .string()
@@ -14,56 +13,40 @@ const passwordSchema = z
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 export const registerSchema = z.object({
-  email: z
-    .string({ required_error: 'Email is required' })
-    .trim()
-    .email('Invalid email address')
-    .toLowerCase(),
+  email: z.string().trim().email('Invalid email address').toLowerCase(),
   password: passwordSchema,
-  firstName: z
-    .string({ required_error: 'First name is required' })
-    .trim()
-    .min(1, 'First name cannot be empty')
-    .max(50, 'First name must be under 50 characters'),
-  lastName: z
-    .string({ required_error: 'Last name is required' })
-    .trim()
-    .min(1, 'Last name cannot be empty')
-    .max(50, 'Last name must be under 50 characters'),
+  firstName: z.string().trim().min(1, 'First name is required').max(50, 'First name too long'),
+  lastName:  z.string().trim().min(1, 'Last name is required').max(50, 'Last name too long'),
   role: z.enum(['ADMIN', 'HR', 'EMPLOYEE']).default('EMPLOYEE'),
 });
 
 export const loginSchema = z.object({
-  email: z
-    .string({ required_error: 'Email is required' })
-    .trim()
-    .email('Invalid email address')
-    .toLowerCase(),
-  password: z.string({ required_error: 'Password is required' }).min(1, 'Password is required'),
+  email:    z.string().trim().email('Invalid email address').toLowerCase(),
+  password: z.string().min(1, 'Password is required'),
 });
 
 export const refreshTokenSchema = z.object({
-  refreshToken: z.string({ required_error: 'Refresh token is required' }).min(1),
+  refreshToken: z.string().min(1, 'Refresh token is required'),
 });
 
 export const changePasswordSchema = z
   .object({
-    currentPassword: z.string({ required_error: 'Current password is required' }).min(1),
-    newPassword: passwordSchema,
-    confirmPassword: z.string({ required_error: 'Confirm password is required' }).min(1),
+    currentPassword: z.string().min(1, 'Current password is required'),
+    newPassword:     passwordSchema,
+    confirmPassword: z.string().min(1, 'Confirm password is required'),
   })
-  .refine((data) => data.newPassword === data.confirmPassword, {
+  .refine((d) => d.newPassword === d.confirmPassword, {
     message: 'Passwords do not match',
     path: ['confirmPassword'],
   })
-  .refine((data) => data.currentPassword !== data.newPassword, {
+  .refine((d) => d.currentPassword !== d.newPassword, {
     message: 'New password must be different from current password',
     path: ['newPassword'],
   });
 
 // ─── Inferred Types ───────────────────────────────────────────────────────────
 
-export type RegisterInput     = z.infer<typeof registerSchema>;
-export type LoginInput        = z.infer<typeof loginSchema>;
-export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
+export type RegisterInput      = z.infer<typeof registerSchema>;
+export type LoginInput         = z.infer<typeof loginSchema>;
+export type RefreshTokenInput  = z.infer<typeof refreshTokenSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
