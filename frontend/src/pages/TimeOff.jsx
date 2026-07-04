@@ -180,32 +180,68 @@ export default function TimeOff() {
       notify.error(err.message);
     }
   };
+  const getGridStatuses = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const day = i + 1;
+      const checkDate = new Date(year, month, day);
+      const checkTime = checkDate.getTime();
+
+      // Find any leave request that covers this day
+      const matchingRequest = requests.find(r => {
+        if (r.status === 'rejected') return false;
+        const start = new Date(typeof r.start_date === 'string' && /^\d+$/.test(r.start_date) ? parseInt(r.start_date, 10) : r.start_date);
+        const end = new Date(typeof r.end_date === 'string' && /^\d+$/.test(r.end_date) ? parseInt(r.end_date, 10) : r.end_date);
+        
+        // Normalize to midnight for accurate comparison
+        const startTime = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+        const endTime = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+
+        return checkTime >= startTime && checkTime <= endTime;
+      });
+
+      if (matchingRequest) {
+        return matchingRequest.status === 'approved' ? 'leave' : 'half-day'; // leave = blue, half-day = amber (pending)
+      }
+
+      // Rest days (Weekends)
+      const dayOfWeek = checkDate.getDay();
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        return 'upcoming';
+      }
+
+      return 'present';
+    });
+  };
 
   return (
     <div>
       <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '2.5rem' }}>Time Off & Leave balances</h1>
+        <h1 style={{ fontSize: '2.5rem' }}>Time Off & Leave Balances</h1>
         <p style={{ color: 'var(--muted)', marginTop: '4px' }}>Manage balances and request time off workflows</p>
       </div>
 
       {loading ? (
-        <div className="loading-spinner">Loading Leave Module...</div>
+        <div className="loading-spinner">Loading Leave Panel...</div>
       ) : (
         <div>
-          {/* Leave Balances Header Cards */}
+          {/* Leave Balances Grid (Top) */}
           <div className="grid-3" style={{ marginBottom: '32px' }}>
             {balances.map((b) => (
               <div key={b.leave_type_id} className="card">
-                <div className="stat-title">{b.leave_type_name}</div>
-                <div className="stat-value" style={{ color: b.leave_category === 'sick' ? 'var(--amber)' : b.leave_category === 'paid' ? 'var(--accent)' : 'var(--ink)' }}>
-                  {b.leave_category === 'unpaid' ? b.days_taken : b.days_available}
+                <span style={{ fontSize: '0.8rem', color: 'var(--muted)', fontWeight: '600', textTransform: 'uppercase' }}>
+                  {b.leave_type_name} ({b.leave_category})
+                </span>
+                <h3 style={{ fontSize: '2rem', margin: '8px 0' }}>
+                  {b.days_available} <span style={{ fontSize: '1rem', color: 'var(--muted)', fontWeight: 'normal' }}>Days Left</span>
+                </h3>
+                <div style={{ fontSize: '0.85rem', color: 'var(--ink-soft)' }}>
+                  Taken: <strong>{b.days_taken}</strong> / Max: {b.max_days || 'Unlimited'}
                 </div>
-                <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '4px' }}>
-                  {b.leave_category === 'unpaid' 
-                    ? `${b.days_taken} days taken (unpaid)` 
-                    : `${b.days_taken} of ${b.max_days} days taken`
-                  }
-                </p>
               </div>
             ))}
           </div>
@@ -227,8 +263,8 @@ export default function TimeOff() {
                     onChange={(e) => setSelectedLeaveTypeId(e.target.value)}
                     required
                   >
-                    {leaveTypes.map(t => (
-                      <option key={t.id} value={t.id}>{t.name} (Max {t.max_days_per_year || 'Unlimited'} Days)</option>
+                    {leaveTypes.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name} ({t.category})</option>
                     ))}
                   </select>
                 </div>
@@ -236,22 +272,31 @@ export default function TimeOff() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Start Date</label>
-                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+                    <input 
+                      type="date" 
+                      value={startDate} 
+                      onChange={(e) => setStartDate(e.target.value)}
+                      required 
+                    />
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>End Date</label>
-                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
+                    <input 
+                      type="date" 
+                      value={endDate} 
+                      onChange={(e) => setEndDate(e.target.value)}
+                      required 
+                    />
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Remarks / Reason</label>
+                  <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>Remarks</label>
                   <textarea 
-                    rows="3" 
-                    placeholder="Remarks..."
+                    rows="2" 
+                    placeholder="Provide a reason for leave..." 
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
-                    required
                   />
                 </div>
 
@@ -273,9 +318,11 @@ export default function TimeOff() {
 
             {/* 2. Calendar Card */}
             <div className="card">
-              <h2 style={{ fontSize: '1.4rem', marginBottom: '16px' }}>Leave Calendar</h2>
+              <h2 style={{ fontSize: '1.4rem', marginBottom: '16px' }}>
+                Leave Calendar ({new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })})
+              </h2>
               <hr style={{ borderColor: 'var(--line)', margin: '12px 0 20px 0' }} />
-              <AlignmentGrid />
+              <AlignmentGrid statusList={getGridStatuses()} size={getGridStatuses().length} />
             </div>
           </div>
 

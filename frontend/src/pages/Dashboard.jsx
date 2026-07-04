@@ -10,6 +10,42 @@ export default function Dashboard() {
   // Safely parse ISO strings or numeric-string timestamps from the DB
   const parseTs = (v) => new Date(typeof v === 'string' && /^\d+$/.test(v) ? parseInt(v, 10) : v);
 
+  const getGridStatuses = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    // Normalize a raw att_date value (numeric ms string or ISO string) to YYYY-MM-DD
+    const normalizeDate = (v) => {
+      if (!v) return '';
+      const d = new Date(typeof v === 'string' && /^\d+$/.test(v) ? parseInt(v, 10) : v);
+      return `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+    };
+
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const day = i + 1;
+      const dateStr = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+      const log = myCheckIns.find(l => normalizeDate(l.att_date) === dateStr);
+
+      if (log) {
+        return log.status === 'half_day' ? 'half-day' : log.status;
+      }
+
+      const checkDate = new Date(year, month, day);
+      if (checkDate > today) {
+        return 'upcoming';
+      }
+
+      const dayOfWeek = checkDate.getDay();
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        return 'upcoming'; // Weekend / rest day
+      }
+
+      return 'absent';
+    });
+  };
+
   const [employeesList, setEmployeesList] = useState([]);
   const [leavesList, setLeavesList] = useState([]);
   const [myCheckIns, setMyCheckIns] = useState([]);
@@ -48,6 +84,7 @@ export default function Dashboard() {
           }
           attendanceLogs {
             id
+            att_date
             check_in
             check_out
             work_hours
@@ -219,7 +256,7 @@ export default function Dashboard() {
             <div>
               <h2 style={{ fontSize: '1.6rem', marginBottom: '16px' }}>This Month at a Glance</h2>
               <div className="card" style={{ marginBottom: '32px' }}>
-                <AlignmentGrid />
+                <AlignmentGrid statusList={getGridStatuses()} size={getGridStatuses().length} />
               </div>
 
               <h2 style={{ fontSize: '1.6rem', marginBottom: '16px' }}>Quick Actions</h2>
