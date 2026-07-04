@@ -259,14 +259,42 @@ export default function Dashboard() {
             <p style={{ color: 'var(--ink-soft)', marginTop: '4px', fontStyle: 'italic' }}>Every workday, perfectly aligned.</p>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '32px' }}>
-            {/* Workspace & Alignment Grid */}
+          {/* Row 1: Heatmap and Today's Shift Clock */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '32px', marginBottom: '32px' }}>
             <div>
               <h2 style={{ fontSize: '1.6rem', marginBottom: '16px' }}>This Month at a Glance</h2>
-              <div className="card" style={{ marginBottom: '32px' }}>
+              <div className="card" style={{ height: 'calc(100% - 40px)', boxSizing: 'border-box' }}>
                 <AlignmentGrid statusList={getGridStatuses()} size={getGridStatuses().length} />
               </div>
+            </div>
 
+            <div>
+              <h2 style={{ fontSize: '1.6rem', marginBottom: '16px' }}>Today's Shift</h2>
+              <div className="card" style={{ textAlign: 'center', height: 'calc(100% - 40px)', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                <div style={{ display: 'inline-flex', width: '64px', height: '64px', borderRadius: '50%', backgroundColor: activeCheckIn ? 'var(--accent-bg)' : 'var(--amber-bg)', justifyContent: 'center', alignItems: 'center', fontSize: '1.8rem', marginBottom: '16px', margin: '0 auto 16px auto' }}>
+                  {activeCheckIn ? '🟢' : '⚪'}
+                </div>
+                <h3 style={{ fontSize: '1.3rem' }}>{activeCheckIn ? 'Shift Active' : 'Shift Inactive'}</h3>
+                <p style={{ color: 'var(--muted)', fontSize: '0.9rem', margin: '8px 0 20px 0' }}>
+                  {activeCheckIn 
+                    ? `Checked in at ${parseTs(activeCheckIn.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+                    : 'You have not clocked in today yet.'
+                  }
+                </p>
+                <button 
+                  className="btn-primary" 
+                  onClick={handleCheckInOut} 
+                  style={{ width: '100%', backgroundColor: activeCheckIn ? 'var(--rose)' : 'var(--accent)' }}
+                >
+                  {activeCheckIn ? 'Check Out' : 'Check In'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: Quick Actions and Recent Logs */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '32px' }}>
+            <div>
               <h2 style={{ fontSize: '1.6rem', marginBottom: '16px' }}>Quick Actions</h2>
               <div className="grid-2">
                 <div className="card" onClick={() => navigate('/profile')} style={{ cursor: 'pointer', textAlign: 'center' }}>
@@ -292,29 +320,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Check-In Status Card & Recent Logs */}
             <div>
-              <h2 style={{ fontSize: '1.6rem', marginBottom: '16px' }}>Today's Shift</h2>
-              <div className="card" style={{ textAlign: 'center', marginBottom: '32px' }}>
-                <div style={{ display: 'inline-flex', width: '64px', height: '64px', borderRadius: '50%', backgroundColor: activeCheckIn ? 'var(--accent-bg)' : 'var(--amber-bg)', justifyContent: 'center', alignItems: 'center', fontSize: '1.8rem', marginBottom: '16px' }}>
-                  {activeCheckIn ? '🟢' : '⚪'}
-                </div>
-                <h3 style={{ fontSize: '1.3rem' }}>{activeCheckIn ? 'Shift Active' : 'Shift Inactive'}</h3>
-                <p style={{ color: 'var(--muted)', fontSize: '0.9rem', margin: '8px 0 20px 0' }}>
-                  {activeCheckIn 
-                    ? `Checked in at ${parseTs(activeCheckIn.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
-                    : 'You have not clocked in today yet.'
-                  }
-                </p>
-                <button 
-                  className="btn-primary" 
-                  onClick={handleCheckInOut} 
-                  style={{ width: '100%', backgroundColor: activeCheckIn ? 'var(--rose)' : 'var(--accent)' }}
-                >
-                  {activeCheckIn ? 'Check Out' : 'Check In'}
-                </button>
-              </div>
-
               <h2 style={{ fontSize: '1.6rem', marginBottom: '16px' }}>Recent Logs</h2>
               <div className="card">
                 {recentLogs.length === 0 ? (
@@ -325,14 +331,17 @@ export default function Dashboard() {
                       <div key={log.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', borderBottom: '1px solid var(--line)', paddingBottom: '8px' }}>
                         <div>
                           <div className="mono-font" style={{ fontWeight: '500' }}>
-                            {parseTs(log.check_in).toLocaleDateString()}
+                            {parseTs(log.check_in || log.att_date).toLocaleDateString()}
                           </div>
                           <div style={{ color: 'var(--muted)', fontSize: '0.75rem' }}>
-                            {parseTs(log.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {log.check_in 
+                              ? parseTs(log.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                              : 'On Leave'
+                            }
                           </div>
                         </div>
-                        <span className={`status-badge ${log.status === 'present' ? 'present' : log.status === 'half_day' ? 'half-day' : 'absent'}`}>
-                          {log.status === 'present' ? 'Present' : 'Half-Day'}
+                        <span className={`status-badge ${log.status === 'present' ? 'present' : log.status === 'half_day' ? 'half-day' : log.status === 'leave' ? 'leave' : 'absent'}`}>
+                          {log.status === 'present' ? 'Present' : log.status === 'half_day' ? 'Half-Day' : log.status === 'leave' ? 'On Leave' : 'Absent'}
                         </span>
                       </div>
                     ))}
