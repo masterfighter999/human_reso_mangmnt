@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext, graphqlRequest } from '../App';
 import AlignmentGrid from '../components/AlignmentGrid';
+import { useNotification } from '../components/NotificationContext';
 
 export default function Attendance() {
   const { user, employee, activeCheckIn, handleCheckInOut, activeRole } = useContext(AuthContext);
+  const notify = useNotification();
   const [logs, setLogs] = useState([]);
   const [remarks, setRemarks] = useState('');
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -87,10 +89,10 @@ export default function Attendance() {
       `;
       await graphqlRequest(checkInMutation, { rem: remarks });
       setRemarks('');
-      alert('Successfully Checked In!');
-      window.location.reload();
+      notify.success('Successfully Checked In! Your shift has started.');
+      fetchAttendanceLogs();
     } catch (err) {
-      alert(err.message);
+      notify.error(err.message);
     }
   };
 
@@ -107,10 +109,10 @@ export default function Attendance() {
       `;
       await graphqlRequest(checkOutMutation, { rem: remarks });
       setRemarks('');
-      alert('Successfully Checked Out!');
-      window.location.reload();
+      notify.success('Successfully Checked Out! Have a great rest of your day.');
+      fetchAttendanceLogs();
     } catch (err) {
-      alert(err.message);
+      notify.error(err.message);
     }
   };
 

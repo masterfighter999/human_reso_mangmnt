@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext, graphqlRequest } from '../App';
+import { useNotification } from '../components/NotificationContext';
 
 export default function Payroll() {
   const { user, activeRole } = useContext(AuthContext);
+  const notify = useNotification();
   const [payslipsList, setPayslipsList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -82,10 +84,10 @@ export default function Payroll() {
         }
       `;
       const data = await graphqlRequest(generateMutation, { m: selectedMonth });
-      alert(`Payroll generated successfully! Created ${data.generatePayslips.length} payslips.`);
+      notify.success(`Payroll generated! Created ${data.generatePayslips.length} payslips for ${selectedMonth}.`);
       fetchPayslips();
     } catch (err) {
-      alert(err.message);
+      notify.error(err.message);
     } finally {
       setLoading(false);
     }

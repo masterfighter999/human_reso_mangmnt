@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { graphqlRequest } from '../App';
+import { useNotification } from '../components/NotificationContext';
 
 export default function Approvals() {
   const [pendingLeaves, setPendingLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
   const [successMsg, setSuccessMsg] = useState('');
+  const notify = useNotification();
 
   const formatRangeDate = (val) => {
     if (!val) return '—';
@@ -65,9 +67,12 @@ export default function Approvals() {
       `;
       await graphqlRequest(mutateQuery, { id, status });
       setSuccessMsg(`Request successfully ${status === 'approved' ? 'Approved' : 'Rejected'} — Employee notified.`);
+      notify[status === 'approved' ? 'success' : 'warning'](
+        `Leave request ${status === 'approved' ? 'approved' : 'rejected'} — Employee has been notified.`
+      );
       fetchPendingLeaves();
     } catch (err) {
-      alert(err.message);
+      notify.error(err.message);
     }
   };
 

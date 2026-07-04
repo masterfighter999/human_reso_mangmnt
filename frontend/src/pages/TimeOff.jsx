@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext, graphqlRequest } from '../App';
 import AlignmentGrid from '../components/AlignmentGrid';
+import { useNotification } from '../components/NotificationContext';
 
 export default function TimeOff() {
   const { user, employee, reloadUser, activeRole } = useContext(AuthContext);
+  const notify = useNotification();
   const [balances, setBalances] = useState([]);
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -172,10 +174,10 @@ export default function TimeOff() {
       setShowReviewModal(false);
       setReviewComments('');
       setReviewRequestId(null);
-      alert('Leave request updated successfully!');
+      notify.success('Leave request updated successfully!');
       fetchData();
     } catch (err) {
-      alert(err.message);
+      notify.error(err.message);
     }
   };
 
