@@ -180,6 +180,26 @@ export default function TimeOff() {
       notify.error(err.message);
     }
   };
+
+  const handleWithdraw = async (id) => {
+    if (!window.confirm("Are you sure you want to withdraw this leave request?")) {
+      return;
+    }
+    try {
+      const withdrawMutation = `
+        mutation Withdraw($id: ID!) {
+          withdrawLeaveRequest(id: $id)
+        }
+      `;
+      await graphqlRequest(withdrawMutation, { id });
+      notify.success("Leave request withdrawn successfully!");
+      fetchData();
+      reloadUser();
+    } catch (err) {
+      notify.error(err.message);
+    }
+  };
+
   const getGridStatuses = () => {
     const today = new Date();
     const year = today.getFullYear();
@@ -341,6 +361,7 @@ export default function TimeOff() {
                     <th>Days</th>
                     <th>Status</th>
                     <th>Reviewer Notes</th>
+                    <th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -357,11 +378,32 @@ export default function TimeOff() {
                       <td style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
                         {r.review_comments || 'No comments'}
                       </td>
+                      <td>
+                        {r.status === 'pending' ? (
+                          <button
+                            onClick={() => handleWithdraw(r.id)}
+                            style={{
+                              padding: '4px 10px',
+                              fontSize: '0.75rem',
+                              backgroundColor: 'transparent',
+                              border: '1px solid var(--rose)',
+                              color: 'var(--rose)',
+                              borderRadius: '4px',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s ease-in-out'
+                            }}
+                          >
+                            Withdraw
+                          </button>
+                        ) : (
+                          <span style={{ color: 'var(--muted)' }}>—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                   {requests.length === 0 && (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)' }}>
+                      <td colSpan={6} style={{ textAlign: 'center', color: 'var(--muted)' }}>
                         No leave applications recorded.
                       </td>
                     </tr>

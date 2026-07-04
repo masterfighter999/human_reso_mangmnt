@@ -640,6 +640,23 @@ const resolvers = {
     const leaveType = ltRes.rows[0];
     if (!leaveType) throw new Error('Invalid leave type');
 
+    // Check for overlapping paid/sick leaves
+    if (leaveType.category === 'paid' || leaveType.category === 'sick') {
+      const overlapRes = await db.query(`
+        SELECT r.id
+        FROM leave_requests r
+        JOIN leave_types t ON r.leave_type_id = t.id
+        WHERE r.employee_id = $1
+          AND r.status != 'rejected'
+          AND t.category IN ('paid', 'sick')
+          AND NOT (r.end_date < $2::DATE OR r.start_date > $3::DATE)
+      `, [employeeId, startDate, endDate]);
+
+      if (overlapRes.rowCount > 0) {
+        throw new Error('You already have a paid/sick leave request covering one or more of these days.');
+      }
+    }
+
     // For paid/sick leaves, validate remaining balance
     if (leaveType.category !== 'unpaid') {
       const year = start.getFullYear();
@@ -870,6 +887,32 @@ const resolvers = {
 
     // Deleting the user cascades to employees (and any FK-linked rows)
     await db.query('DELETE FROM users WHERE id = $1', [userId]);
+    return true;
+  },
+
+  withdrawLeaveRequest: async ({ id }, context) => {
+    if (!context.user) throw new Error('Authentication required');
+
+    // Check if the request exists and is pending
+    const reqRes = await db.query('SELECT * FROM leave_requests WHERE id = $1', [id]);
+    if (reqRes.rowCount === 0) throw new Error('Leave request not found');
+    const request = reqRes.rows[0];
+
+    // Get the current employee's profile to make sure they own the request
+    const empRes = await db.query('SELECT id FROM employees WHERE user_id = $1', [context.user.id]);
+    if (empRes.rowCount === 0) throw new Error('Employee profile not found');
+    const employeeId = empRes.rows[0].id;
+
+    if (context.user.role !== 'admin' && request.employee_id !== employeeId) {
+      throw new Error('Unauthorized to withdraw this request');
+    }
+
+    if (request.status !== 'pending') {
+      throw new Error('Only pending leave requests can be withdrawn');
+    }
+
+    // Delete the request
+    await db.query('DELETE FROM leave_requests WHERE id = $1', [id]);
     return true;
   }
 };
