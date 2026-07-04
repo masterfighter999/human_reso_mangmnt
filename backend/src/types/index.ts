@@ -2,7 +2,7 @@ import { Request } from 'express';
 
 // ─── RBAC Roles ───────────────────────────────────────────────────────────────
 
-export type UserRole = 'admin' | 'employee';
+export type UserRole = 'ADMIN' | 'HR' | 'EMPLOYEE';
 
 // ─── JWT Payload ──────────────────────────────────────────────────────────────
 
@@ -51,7 +51,6 @@ export interface PaginationMeta {
 
 export interface UserRow {
   id: string;
-  login_id: string;
   email: string;
   password_hash: string;
   role: UserRole;

@@ -36,7 +36,7 @@ export class LeaveService {
     let targetEmployeeId = employeeIdParam;
 
     if (!targetEmployeeId) {
-      if (role !== 'admin') {
+      if (role !== 'ADMIN') {
         const empRes = await query(`SELECT id FROM employees WHERE user_id = $1`, [userId]);
         if (empRes.rowCount && empRes.rowCount > 0) {
           targetEmployeeId = empRes.rows[0].id;

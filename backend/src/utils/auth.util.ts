@@ -24,7 +24,7 @@ export const signAccessToken = (userId: string, email: string, role: UserRole): 
 
 export const signEmailVerificationToken = (userId: string, email: string): string =>
   jwt.sign(
-    { sub: userId, email, role: 'employee' } satisfies Omit<JwtPayload, 'iat' | 'exp'>,
+    { sub: userId, email, role: 'EMPLOYEE' } satisfies Omit<JwtPayload, 'iat' | 'exp'>,
     env.JWT_ACCESS_SECRET,
     { expiresIn: '24h' }, // Verification link valid for 24 hours
   );

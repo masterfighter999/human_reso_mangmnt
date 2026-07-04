@@ -29,13 +29,13 @@ async function reset(): Promise<void> {
     await client.query(`
       DROP TABLE IF EXISTS
         audit_logs,
-        payroll,
+        payslips,
+        salary_structures,
+        documents,
         leave_requests,
         leave_types,
         attendance,
         employees,
-        departments,
-        designations,
         refresh_tokens,
         users,
         schema_migrations
